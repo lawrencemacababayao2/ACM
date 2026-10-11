@@ -1,0 +1,1520 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+
+:root {
+  --green: #188B5D;
+  --green-dark: #126242;
+  --green-soft: #e3f0ea;
+  --green-ring: rgba(24, 139, 93, .14);
+  --border: #e5e7eb;
+  --border-soft: #eef0f3;
+  --text: #111827;
+  --muted: #6b7280;
+  --bg: #f6f7f9;
+  --white: #fff;
+  --danger: #dc2626;
+  --danger-soft: #fdecec;
+--sidebar: #062B1C;
+  --header-height: 73px;
+  --radius: 12px;
+  --shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 1px 3px rgba(16, 24, 40, .06);
+  --shadow-lg: 0 12px 32px rgba(16, 24, 40, .12), 0 2px 6px rgba(16, 24, 40, .06);
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: 'Poppins', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: inherit; text-decoration: none; }
+button { font: inherit; cursor: pointer; }
+input, select, textarea { font: inherit; }
+/* Free-text inputs capitalise only their first letter, applied in main.jsx on
+   blur. CSS text-transform: capitalize would uppercase the start of every word,
+   which is not the rule, and it cannot target only the value's first character.
+   The transform updates the value too, so what is shown is what is stored. */
+
+.card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 16px;
+}
+
+/* ---------- Login ---------- */
+.login-wrap {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--sidebar);
+  padding: 24px;
+  overflow: hidden;
+}
+/* The photo is blurred on its own layer: a filter on .login-wrap itself would
+   blur the sign-in card too. The 1.05 scale hides the soft, semi-transparent
+   edge the blur leaves at the viewport border. */
+.login-wrap::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url('/login-background.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: blur(8px);
+  transform: scale(1.05);
+  z-index: 0;
+}
+.login-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 400px;
+  background: var(--white);
+  border-radius: 18px;
+  padding: 34px 32px;
+  box-shadow: var(--shadow-lg);
+}
+.login-card h1 { font-size: 21px; margin: 0 0 4px; letter-spacing: -.01em; }
+      .login-card .sub { color: var(--muted); margin: 0 0 26px; font-size: 13.5px; }
+/* The seal is centred on its own with auto margins, so the heading block is
+         centred to line up with it. The inputs and their labels stay left-aligned:
+         centring text inside a field someone is typing into makes the value harder
+         to find, and it would not line up with the caret. */
+      .login-card h1,
+      .login-card .sub { text-align: center; }
+      /* .btn is inline-flex and packs its content to the left, which is what the
+         app's icon + label buttons want. The sign-in button is the one full-width
+         .btn in the portal, and at that width it left the label stranded against
+         the left edge, so its content is centred to match. Scoped here rather than
+         on .btn so the icon buttons elsewhere keep their alignment.
+
+         The margin-top fixes the same button's spacing: the password field carries
+         only .field's 4px bottom margin, so the gap above the button was 4px. .btn
+         is inline-flex, so its margin does not collapse with that 4px and the two
+         add: 20px here gives a 24px gap. */
+      .login-card .btn { justify-content: center; margin-top: 20px; }
+
+/* ---------- Layout ---------- */
+.layout { display: flex; min-height: 100vh; }
+.sidebar {
+  width: 236px;
+  background: var(--sidebar);
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  flex-shrink: 0;
+}
+/* --header-height is shared with .app-bar so the two blocks always end on the
+   same line; the divider colour matches the sidebar hairline. The height is fixed
+   rather than left to the content so the top bar cannot drift. */
+.brand { display: flex; align-items: center; gap: 11px; padding: 18px 18px; height: var(--header-height); border-bottom: 1px solid rgba(255, 255, 255, .07); }
+.brand .logo {
+  width: 36px; height: auto; border-radius: 10px;
+  color: #fff; display: block; object-fit: contain;
+}
+  .brand h1 { font-size: 14.5px; margin: 0; color: #fff; line-height: 1.25; font-weight: 700; }
+  .brand small { color: #64748b; font-size: 11px; }
+  .brand-txt { min-width: 0; overflow: hidden; }
+  .brand-txt h1, .brand-txt small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nav { flex: 1; padding: 12px 10px; overflow-y: auto; }
+.nav a {
+  display: flex; align-items: center; gap: 11px; padding: 9px 12px; border-radius: 9px;
+  color: #94a3b8; margin-bottom: 2px; font-size: 13.5px; font-weight: 500;
+  transition: background .12s ease, color .12s ease;
+}
+.nav a:hover { background: rgba(255, 255, 255, .06); color: #e2e8f0; }
+.nav a.active { background: var(--green); color: #fff; font-weight: 600; box-shadow: 0 4px 14px rgba(24, 139, 93, .3); }
+/* Mouse clicks leave no ring -- the green active pill already marks the current
+   page, and the default focus outline is what flashes thick and white on the dark
+   sidebar. Keyboard focus keeps a visible outline, matching the submenu parent. */
+.nav a:focus { outline: none; }
+.nav a:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; }
+
+/* ---------- Reports submenu ---------- */
+/* The parent is a <button>, not an <a>, so the link rules above do not apply to
+   it; these mirror them exactly, including the same green active treatment, so the
+   two read as the same kind of item. Width 100% plus the parent's own box model is
+   what keeps the button aligned with the links above it. */
+.nav-parent {
+  display: flex; align-items: center; gap: 11px; width: 100%;
+  padding: 9px 12px; border-radius: 9px; margin-bottom: 2px;
+  background: none; border: 0; font: inherit; font-size: 13.5px; font-weight: 500;
+  color: #94a3b8; text-align: left; cursor: pointer;
+  transition: background .12s ease, color .12s ease;
+}
+.nav-parent:hover { background: rgba(255, 255, 255, .06); color: #e2e8f0; }
+.nav-parent:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; }
+.nav-parent.active { background: var(--green); color: #fff; font-weight: 600; box-shadow: 0 4px 14px rgba(24, 139, 93, .3); }
+
+/* The caret is pushed to the far edge regardless of label length, and turns down
+   when the submenu is open. Rotation rather than an icon swap keeps the transition
+   continuous. */
+.nav-caret { margin-left: auto; flex-shrink: 0; transition: transform .18s ease; }
+.nav-parent[aria-expanded='true'] .nav-caret { transform: rotate(90deg); }
+
+.nav-submenu { display: flex; flex-direction: column; }
+/* Children are indented under the parent and sized down slightly, which is what
+   communicates the parent/child relationship without a border or background. */
+/* Children carry no icon, so the indent is the only cue that they belong to the
+   parent. 41px lines the child label up with the parent's own label, which starts
+   after that item's icon and gap -- that alignment is what makes the nesting read
+   as a nesting rather than as a flat list. */
+.nav-submenu .nav-child {
+  padding: 7px 12px 7px 41px; font-size: 13px; color: #7d8da3; margin-bottom: 1px;
+}
+.nav-submenu .nav-child:hover { background: rgba(255, 255, 255, .06); color: #e2e8f0; }
+/* The active child keeps the same green as every other active nav item. */
+.nav-submenu .nav-child.active { background: var(--green); color: #fff; font-weight: 600; box-shadow: 0 4px 14px rgba(24, 139, 93, .3); }
+
+/* Collapsed sidebar: the submenu leaves the nav's flow and floats beside the
+   sidebar. Coordinates come from the parent's measured rect (see Layout.jsx), so
+   this only carries appearance and its own stacking. */
+.nav-submenu.flyout {
+  position: fixed; z-index: 60; min-width: 232px; padding: 6px;
+  background: #111d33; border: 1px solid rgba(255, 255, 255, .1);
+  border-radius: 11px; box-shadow: 0 18px 44px rgba(2, 6, 23, .55);
+}
+.nav-submenu.flyout .nav-child { padding: 8px 10px; margin-bottom: 2px; }
+
+.side-foot { padding: 14px 18px; border-top: 1px solid rgba(255, 255, 255, .07); font-size: 13px; }
+.side-foot .user { color: #e2e8f0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.side-foot .role { color: #64748b; text-transform: capitalize; font-size: 12px; }
+  .side-foot button { margin-top: 10px; width: 100%; justify-content: center; }
+
+/* ---------- Collapsed sidebar ---------- */
+  .sidebar.collapsed { width: 64px; }
+  .sidebar.collapsed .brand {
+    flex-direction: column; gap: 8px;
+    padding: 18px 0; justify-content: center;
+  }
+  .sidebar.collapsed .brand-txt,
+  .sidebar.collapsed .brand h1,
+  .sidebar.collapsed .brand small,
+  .sidebar.collapsed .nav a span.txt,
+  .sidebar.collapsed .side-foot .user,
+  .sidebar.collapsed .side-foot .role { display: none; }
+.sidebar.collapsed .nav a { justify-content: center; padding: 10px; }
+  .sidebar.collapsed .nav-parent { justify-content: center; padding: 10px; }
+  /* No room for the caret on a 64px rail, and the submenu is a flyout rather than
+     an inline list, so the affordance would be misleading. */
+  .sidebar.collapsed .nav-caret { display: none; }
+  /* The collapsed rules above strip labels from every anchor in the nav, which
+     would also strip them from the flyout -- where the whole point is to name each
+     category. These two restore the labels and undo the centring, and are scoped
+     to the flyout so they cannot leak into the icon-only rail. */
+  .sidebar.collapsed .nav-submenu.flyout a span.txt { display: inline; }
+  .sidebar.collapsed .nav-submenu.flyout .nav-child { justify-content: flex-start; padding: 8px 10px; }
+  .sidebar.collapsed .side-foot { display: flex; justify-content: center; padding: 12px 0; }
+  .sidebar.collapsed .side-foot button { width: 36px; font-size: 0; padding: 7px; }
+  
+.content { flex: 1; padding: 26px 30px 40px; min-width: 0; }
+
+/* The white top bar. It lives in the layout once, spanning the content area edge
+   to edge. It shares --header-height with .sidebar .brand so their bottom edges
+   land on the same pixel, and border-bottom uses the same gray as the tab divider.
+   Sticky keeps it pinned while content scrolls beneath (above normal content,
+   below the sidebar flyouts, modals and popovers). */
+.app-bar {
+  position: sticky; top: 0; z-index: 40;
+  height: var(--header-height);
+  display: flex; align-items: center;
+  margin: -26px -30px 0; padding: 0 30px;
+  background: var(--white);
+  border-bottom: 1px solid var(--border);
+}
+/* The burger. Far left, inside the bar's content padding so it aligns with the
+   page columns underneath. Dark icon over a light-gray hover so it reads as a
+   content-area menu, not a sidebar control. */
+.appbar-toggle {
+  width: 34px; height: 34px; padding: 0;
+  display: grid; place-items: center;
+  border: 0; border-radius: 8px;
+  background: transparent; color: var(--text); cursor: pointer;
+  transition: background .12s ease;
+}
+.appbar-toggle:hover { background: var(--border-soft); }
+.appbar-toggle:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; }
+
+/* Title and subtitle block, rendered by <PageHeader> at the top of each page,
+   just below the white bar, dark text on the light page background. */
+.page-head { margin: 24px 0 20px; }
+.page-head h2 { font-size: 20px; margin: 0; font-weight: 700; letter-spacing: -.01em; color: var(--text); }
+.page-head .sub { color: var(--muted); margin: 3px 0 0; font-size: 13.5px; }
+
+/* Row below the title block on pages without tabs (Reports, Landing Content): the
+   action buttons, right-aligned, on a line of their own. */
+.page-actions {
+  display: flex; align-items: center; justify-content: flex-end;
+  gap: 10px; flex-wrap: wrap; margin-bottom: 14px;
+}
+
+/* ---------- Buttons ---------- */
+.btn {
+  border: 1px solid var(--border); background: var(--white); color: var(--text);
+  padding: 8px 14px; border-radius: 9px; font-weight: 550; font-size: 13.5px;
+  display: inline-flex; align-items: center; gap: 6px;
+  transition: background .12s ease, border-color .12s ease, box-shadow .12s ease;
+  box-shadow: var(--shadow);
+}
+.btn:hover { background: #f9fafb; border-color: #d1d5db; }
+.btn.primary { background: var(--green); border-color: var(--green); color: #fff; box-shadow: 0 2px 8px rgba(24, 139, 93, .25); }
+.btn.primary:hover { background: var(--green-dark); border-color: var(--green-dark); }
+.btn.ghost { background: transparent; border-color: rgba(255, 255, 255, .14); color: #cbd5e1; box-shadow: none; }
+.btn.ghost:hover { background: rgba(255, 255, 255, .08); color: #fff; }
+.btn.danger { background: #fff; border-color: #fecaca; color: var(--danger); }
+.btn.danger:hover { background: #fef2f2; }
+.btn.sm { padding: 5px 10px; font-size: 12.5px; border-radius: 8px; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.icon-btn {
+  border: none; background: none; color: var(--muted); padding: 5px; border-radius: 8px;
+  display: inline-flex; align-items: center; justify-content: center; line-height: 1;
+}
+.icon-btn:hover { background: var(--border-soft); color: var(--text); }
+
+/* ---------- Stats ---------- */
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 20px; }
+.stat { padding: 16px 18px; }
+.stat .lbl { color: var(--muted); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.stat .num { font-size: 28px; font-weight: 750; margin-top: 8px; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.stat.green .num { color: var(--green); }
+.stat.red .num { color: var(--danger); }
+.stat.blue .num { color: #2563eb; }
+.stat-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 10px; margin-bottom: 8px;
+}
+.stat-icon.is-green { background: var(--green-soft); color: var(--green-dark); }
+.stat-icon.is-amber { background: #fef3c7; color: #b45309; }
+.stat-icon.is-blue { background: #dbeafe; color: #1d4ed8; }
+.stat-icon.is-red { background: #fee2e2; color: #b91c1c; }
+.stat-icon.is-gray { background: #f1f5f9; color: #475569; }
+
+/* ---------- Dashboard stat cards ---------- */
+/* Overrides of the shared .stats/.stat rules, scoped to `dash-stats` so the
+   Reports summary cards keep their original layout. Tier 1 cards use a pastel
+   background with a solid icon badge on the right; tier 2 cards are neutral
+   with no icon. Equal columns + media queries keep every card in a row the
+   same height at desktop, tablet and mobile widths. */
+.dash-stats { gap: 16px; }
+.dash-stats-3 { grid-template-columns: repeat(3, 1fr); }
+.dash-stats-4 { grid-template-columns: repeat(4, 1fr); }
+.dash-stat {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 14px; padding: 20px; border-radius: 14px;
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+/* Clicking a linked card navigates; hover lift only applies to those cards so
+   a plain card like SMS Credits never reads as interactive. */
+.dash-stat.clickable { cursor: pointer; }
+.dash-stat.clickable:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+/* The <Link> wrapper is an invisible full-cell hit area around the card. */
+.dash-stat-link { display: contents; color: inherit; text-decoration: none; }
+
+/* Tier 1: pastel backgrounds, no border. */
+.dash-stat--tier1 { border: 0; }
+.dash-stat--tier1.mint { background: #D9F2E3; }
+.dash-stat--tier1.amber { background: #FFF1D6; }
+.dash-stat--tier1.pink { background: #FFE4E8; }
+
+/* Tier 2: neutral cards, distinguishable from the page background. */
+.dash-stat--tier2 { background: var(--white); border: 1px solid var(--border); box-shadow: var(--shadow); }
+
+.dash-stat .stat-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.dash-stat .lbl { font-size: 14px; font-weight: 500; color: #374151; }
+.dash-stat .num {
+  font-size: 30px; font-weight: 700; color: var(--text);
+  letter-spacing: -.02em; font-variant-numeric: tabular-nums; line-height: 1.1;
+}
+/* Solid icon badge (tier 1 only): white line icon on a colored circle. */
+.stat-circle {
+  width: 44px; height: 44px; border-radius: 50%; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff;
+}
+.stat-circle.mint { background: #22A45D; }
+.stat-circle.amber { background: #F59E0B; }
+.stat-circle.pink { background: #FF4D6D; }
+
+@media (max-width: 1100px) {
+  .dash-stats-3, .dash-stats-4 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+  .dash-stats-3, .dash-stats-4 { grid-template-columns: 1fr; }
+}
+
+/* ---------- Skeleton loading ---------- */
+/* A skeleton is a flat neutral-gray block with a soft light sweep. Sizing is set
+   inline by the components; these rules only give it the shape and the sweep.
+   `prefers-reduced-motion` drops the sweep and leaves a static gray bar. */
+.skeleton {
+  display: inline-block;
+  position: relative;
+  overflow: hidden;
+  flex: none;
+  vertical-align: middle;
+  background: #e8eaee;
+}
+.skeleton-live::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, .6) 50%, transparent 80%);
+  transform: translateX(-100%);
+  animation: skeleton-sweep 1.4s infinite;
+  pointer-events: none;
+}
+@keyframes skeleton-sweep {
+  to { transform: translateX(100%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-live::after { display: none; }
+}
+
+/* A skeleton table keeps its rows the same height as a real table's, so the card
+   resolves to the same size once the data lands. */
+.skeleton-table thead th { height: 33px; vertical-align: middle; }
+.skeleton-table tbody td {
+  height: 40px;
+  padding-top: 0;
+  padding-bottom: 0;
+  vertical-align: middle;
+}
+
+/* Row pairing a thumbnail with a caption bar (carousel slides). */
+.skeleton-thumb-row { display: inline-flex; align-items: center; gap: 10px; }
+.skeleton-thumb-row .skeleton:first-child { flex: none; }
+
+/* Map the colored icon badge slot in a tier-1 dashboard stat to a gray circle. */
+.stat-circle-sk { flex: none; }
+
+/* Chart card: bars sit along the bottom edge like a real bar chart. */
+.skeleton-chart-card { padding: 18px; }
+.skeleton-chart-body { display: flex; align-items: flex-end; gap: 8px; }
+
+/* Tabs and filters skeletons stand in for their own row. */
+.tabs-skeleton { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tabs-skeleton-tab { display: inline-flex; align-items: center; gap: 6px; }
+.filter-skeleton-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* Landing content accordion row skeleton. */
+.landing-skeleton-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 18px;
+  margin-bottom: 10px;
+}
+.landing-skeleton-item .skeleton:last-child { margin-left: auto; }
+
+/* Modal form skeleton: label bar above an input-sized bar. */
+.form-skeleton .form-grid-cell .skeleton:first-child { margin-bottom: 6px; }
+.form-skeleton-span { grid-column: 1 / -1; }
+.form-skeleton-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+
+/* Visually hidden live region used by LoadingStatus. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Soft elevation so the table reads as a raised card rather than a flat outline. */
+.table-card { border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; }
+.table-card .table { border: 0; border-radius: 0; }
+/* The header uses a very light tint of the brand green, not a new palette entry. */
+.table-card thead th { background: #f2f8f5; border-bottom: 1px solid var(--border); }
+.table-card thead th:first-child { border-top-left-radius: 0; }
+
+.th-sort {
+  display: inline-flex; align-items: center; gap: 5px;
+  border: 0; background: transparent; padding: 0;
+  color: inherit; font: inherit; font-size: 11.5px; font-weight: 700;
+  letter-spacing: .05em; text-transform: uppercase; cursor: pointer;
+}
+.th-sort:hover { color: var(--green-dark); }
+.th-sort.active { color: var(--green-dark); }
+.th-sort-icon { display: inline-flex; opacity: .35; }
+.th-sort:hover .th-sort-icon { opacity: .7; }
+.th-sort.active .th-sort-icon { opacity: 1; color: var(--green); }
+
+.table-wrap { overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; }
+.table th {
+  text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--muted); font-weight: 600; padding: 11px 14px; border-bottom: 1px solid var(--border);
+  white-space: nowrap; background: #fafbfc;
+}
+.table td { padding: 12px 14px; border-bottom: 1px solid var(--border-soft); vertical-align: top; font-size: 13.5px; }
+.table tr:last-child td { border-bottom: none; }
+.table tr:hover td { background: #fafcff; }
+.table .empty { text-align: center; color: var(--muted); padding: 34px; }
+.row-actions { display: flex; gap: 6px; white-space: nowrap; align-items: center; justify-content: flex-end; }
+
+/* ---------- Row overflow menu ---------- */
+.action-menu { position: relative; display: inline-flex; }
+.action-menu-pop {
+  position: fixed; z-index: 90;
+  min-width: 130px; padding: 5px;
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: 10px; box-shadow: var(--shadow-lg);
+  display: flex; flex-direction: column; gap: 1px;
+}
+.action-menu-item {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; padding: 8px 10px; border: 0; border-radius: 7px;
+  background: transparent; color: var(--text);
+  font: inherit; font-size: 13px; text-align: left; cursor: pointer;
+}
+.action-menu-item:hover { background: var(--border-soft); }
+.action-menu-item.danger { color: var(--danger); }
+.action-menu-item.danger:hover { background: #fef2f2; }
+/* Blocked action: visible but inert. It wins over .danger on colour so a
+   deactivated-looking "Deactivate" is not painted red while being unclickable. */
+.action-menu-item.is-disabled,
+.action-menu-item.is-disabled:hover { background: transparent; color: #94a3b8; cursor: not-allowed; }
+.action-menu-item.is-disabled svg { opacity: .55; }
+.action-menu-item svg { flex: none; }
+
+/* Inline explanation beside a blocked row action. Hidden from assistive tech
+   because the reason is already on the menu item's title and aria-disabled. */
+.action-blocked-hint {
+  font-size: 11px; color: #94a3b8; max-width: 190px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* ---------- Badges ---------- */
+.badge {
+  display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; white-space: nowrap; letter-spacing: .01em;
+}
+.badge.gray { background: #f1f5f9; color: #475569; }
+.badge.green { background: #dcece3; color: #126242; }
+.badge.amber { background: #fef3c7; color: #b45309; }
+.badge.blue { background: #dbeafe; color: #1d4ed8; }
+.badge.red { background: #fee2e2; color: #b91c1c; }
+.badge.purple { background: #f3e8ff; color: #7c3aed; }
+/* Type badges use their own hues (teal / sky / plum) so a category badge is never
+   mistaken for a status badge, which owns green / amber / red. */
+.badge.teal { background: #ccfbf1; color: #0f766e; }
+.badge.sky { background: #e0f2fe; color: #0369a1; }
+.badge.plum { background: #fae8ff; color: #a21caf; }
+/* "You" marks identity, not state, so it stays neutral: an outline rather than a
+   fill, so it can never be misread as a role or a status colour. */
+.badge.you {
+  background: transparent; color: #475569; border: 1px solid #cbd5e1;
+  padding: 1px 8px; font-size: 11px; letter-spacing: .04em; text-transform: uppercase;
+}
+
+/* ---------- Name cell (User Management) ---------- */
+/* Two lines of text: the name, then the email. min-width: 0 lets the truncating
+   children shrink inside the table's automatic layout instead of forcing the
+   column wider than the viewport. */
+.name-cell { min-width: 0; }
+/* Both text lines stay on one line each and truncate instead of wrapping. Wrapping
+   was the failure: a long address broke the cell across four lines at ~1024px, and
+   the Name column stopped being scannable. nowrap also raises the table's min-content
+   width, so .table-wrap scrolls horizontally rather than crushing the column. The
+   full value stays reachable through the title attribute. */
+.name-cell-title { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.name-cell-title strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.name-cell-title .badge.you { flex: none; }
+.name-cell-email { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Date columns were the tallest thing in the row: "Sep 29, 2026, 7:20 PM" wrapped to
+   three lines once the table fell below ~1400px, so the whole row grew to 78px even
+   though the name beside it was a tidy two lines. nowrap hands the width back to the
+   table, and .table-wrap scrolls horizontally instead. */
+.nowrap { white-space: nowrap; }
+
+
+
+/* ---------- Filters ---------- */
+/* ---------- Status tabs ---------- */
+.status-tabs {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border); margin-bottom: 14px;
+}
+.status-tabs-list { display: flex; gap: 4px; flex-wrap: wrap; }
+/* Page action buttons sit on the same line as the tabs, pinned to the far edge.
+   margin-left: auto keeps them right-aligned even when the row wraps. */
+.status-tabs-actions { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+.status-tab {
+  position: relative;
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 10px 14px; border: 0; background: transparent;
+  color: var(--muted); font: inherit; font-size: 13.5px; font-weight: 600;
+  cursor: pointer; border-radius: 8px 8px 0 0;
+}
+.status-tab:hover { color: var(--text); background: var(--border-soft); }
+/* The active tab is marked with a brand-green underline rather than a fill, so the
+   tab row reads as a set of tabs and not as another set of buttons. */
+.status-tab::after {
+  content: ''; position: absolute; left: 8px; right: 8px; bottom: -1px;
+  height: 2px; border-radius: 2px; background: transparent;
+}
+.status-tab.active { color: var(--green-dark); }
+.status-tab.active::after { background: var(--green); }
+.status-tab-count {
+  padding: 1px 7px; border-radius: 999px;
+  background: var(--border-soft); color: var(--muted);
+  font-size: 11.5px; font-weight: 700;
+}
+.status-tab.active .status-tab-count { background: var(--green-soft); color: var(--green-dark); }
+/* A tab may override its count's tone (the Pending tab goes amber once there is
+   something waiting, matching the sidebar badge). Only the two tones that carry
+   meaning are defined; anything else falls back to the neutral rule above. */
+.status-tab-count.amber { background: #fef3c7; color: #b45309; }
+.status-tab-count.green { background: var(--green-soft); color: var(--green-dark); }
+
+/* Native select styled to match .field inputs. Used by the landing-content
+   editors, which sit inside .field wrappers like any other form control. */
+.custom-select {
+  width: 100%; min-height: 39px; padding: 9px 12px;
+  background: var(--white); border: 1px solid var(--border); border-radius: 9px;
+  color: var(--text); font: inherit; font-size: 14px;
+}
+.custom-select:focus {
+  outline: none; border-color: var(--green); box-shadow: 0 0 0 3px var(--green-ring);
+}
+.custom-select:disabled { background: #f6f7f9; color: var(--muted); cursor: not-allowed; }
+
+/* ---------- Toolbar ---------- */
+.toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+
+/* Rounded pill search with a leading icon and an inline clear button. */
+.search-pill {
+  flex: 1 1 260px; min-width: 0;
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 12px; height: 38px;
+  background: var(--white); border: 1px solid var(--border); border-radius: 999px;
+  color: var(--muted);
+}
+.search-pill:focus-within { border-color: var(--green); box-shadow: 0 0 0 3px var(--green-ring); }
+.search-pill input {
+  flex: 1; min-width: 0; height: 100%;
+  border: 0; background: transparent; padding: 0; font: inherit; font-size: 13.5px;
+}
+.search-pill input:focus { outline: none; }
+.search-clear {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; flex: none;
+  border: 0; border-radius: 50%; padding: 0;
+  background: var(--border-soft); color: var(--muted); cursor: pointer;
+}
+.search-clear:hover { background: #e2e6ea; color: var(--text); }
+
+.toolbar-filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+/* The date range is a single pill trigger opening a branded calendar, so the
+   native date inputs and their unstyleable popup are gone. */
+/* Fixed rather than absolute so it can be nudged back inside the window; the
+   top/left coordinates are measured in DateRangePicker. The body scrolls on short
+   viewports so the green header and the footer stay put. */
+.date-picker-pop {
+  position: fixed; z-index: 60;
+  display: flex; flex-direction: column;
+  width: 296px; max-height: calc(100vh - 16px);
+  padding: 0 0 6px; background: var(--white); border-radius: 14px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, .12), 0 2px 6px rgba(15, 23, 42, .06);
+  overflow: hidden;
+}
+.date-picker-body { overflow-y: auto; min-height: 0; }
+.date-picker-head {
+  display: flex; align-items: center; gap: 4px;
+  padding: 10px 10px; background: var(--green); color: var(--white);
+}
+.date-picker-title { flex: 1; text-align: center; font-size: 13.5px; font-weight: 700; letter-spacing: .2px; }
+.date-picker-title-row { display: inline-flex; align-items: center; gap: 4px; justify-content: center; }
+/* The header year jump for pickers that can reach far years (birthdays). Native
+   select styled to sit inside the green header, not clash with the chevrons. */
+.date-picker-year {
+  appearance: none; -webkit-appearance: none;
+  border: 0; border-radius: 6px; padding: 1px 4px;
+  background: rgba(255, 255, 255, .18); color: inherit;
+  font: inherit; font-weight: 700; cursor: pointer;
+}
+.date-picker-year:hover { background: rgba(255, 255, 255, .3); }
+.date-picker-nav {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; padding: 0; border: 0; border-radius: 8px;
+  background: transparent; color: var(--white); cursor: pointer;
+}
+.date-picker-nav:hover { background: rgba(255, 255, 255, .22); }
+
+.date-picker-week, .date-picker-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px;
+  padding: 0 10px;
+}
+.date-picker-week { padding-top: 10px; padding-bottom: 4px; }
+.date-picker-wd { text-align: center; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; }
+
+.date-picker-grid { padding-bottom: 4px; }
+.date-picker-day {
+  height: 32px; border: 0; border-radius: 8px; background: transparent;
+  font: inherit; font-size: 12.5px; color: var(--text); cursor: pointer;
+}
+.date-picker-day:hover { background: var(--green-soft); }
+.date-picker-day.is-outside { color: var(--muted); opacity: .45; }
+/* Outside a min/max window, e.g. a birthday that would put the beneficiary
+   outside the allowed age band. Kept visible so the window is discoverable. */
+.date-picker-day.is-disabled { color: var(--muted); opacity: .3; cursor: not-allowed; text-decoration: line-through; }
+.date-picker-day.is-disabled:hover { background: transparent; }
+.date-picker-day.is-today { box-shadow: inset 0 0 0 1px var(--green); font-weight: 700; }
+/* Days strictly between the ends get a tint; the ends themselves are solid, which
+   paints the range as one continuous band. */
+.date-picker-day.in-range { background: var(--green-soft); border-radius: 0; }
+.date-picker-day.is-edge { background: var(--green); color: var(--white); font-weight: 700; box-shadow: none; }
+.date-picker-day.is-edge:hover { background: var(--green-dark); }
+
+.date-picker-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin: 4px 10px 0; padding-top: 8px; border-top: 1px solid var(--border);
+  font-size: 12px; color: var(--muted);
+}
+.date-picker-hint { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.date-picker-clear {
+  flex: none; border: 0; background: transparent; padding: 2px 4px; border-radius: 6px;
+  font: inherit; font-size: 12px; font-weight: 700; color: var(--danger); cursor: pointer;
+}
+.date-picker-clear:hover { background: var(--danger-soft); }
+.date-picker-today {
+  flex: none; border: 0; background: transparent; padding: 2px 4px; border-radius: 6px;
+  font: inherit; font-size: 12px; font-weight: 700; color: var(--green); cursor: pointer;
+}
+.date-picker-today:hover { background: var(--green-soft); }
+.date-picker-foot-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+
+/* Date + time (Programs schedule). The calendar keeps its own scroll area so the
+   time columns and the footer stay reachable on short viewports. */
+.date-picker-pop.is-split { width: 316px; }
+.date-picker-calendar { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.date-picker-calendar .date-picker-body { overflow: visible; }
+
+.time-picker { padding: 8px 10px 2px; border-top: 1px solid var(--border); }
+.time-picker-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-bottom: 6px; }
+.time-picker-title { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .3px; }
+.time-picker-seg { display: inline-flex; padding: 2px; background: var(--bg); border-radius: 8px; }
+.time-picker-seg button {
+  border: 0; background: transparent; padding: 3px 10px; border-radius: 6px;
+  font: inherit; font-size: 11.5px; font-weight: 700; color: var(--muted); cursor: pointer;
+}
+.time-picker-seg button.is-on { background: var(--green); color: var(--white); }
+
+.time-picker-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.time-picker-cap {
+  display: block; text-align: center; font-size: 10.5px; font-weight: 700;
+  color: var(--muted); text-transform: uppercase; padding-bottom: 3px;
+}
+.time-picker-list {
+  display: grid; grid-auto-flow: column; grid-template-rows: repeat(12, 1fr); gap: 2px;
+  max-height: 176px; overflow-y: auto; padding: 2px;
+}
+.time-picker-item {
+  height: 26px; border: 0; border-radius: 7px; background: transparent;
+  font: inherit; font-size: 12.5px; color: var(--text); cursor: pointer;
+}
+.time-picker-item:hover { background: var(--green-soft); }
+.time-picker-item.is-sub { color: var(--muted); font-size: 12px; }
+.time-picker-item.is-on { background: var(--green); color: var(--white); font-weight: 700; }
+.time-picker-item.is-on:hover { background: var(--green-dark); }
+
+/* ---------- Time range (trainings & seminars) ---------- */
+/* Same popover shell as the date pickers so the two controls look like one family.
+   `.is-time` is narrower because it holds one wheel instead of a month grid. */
+.time-range-picker { display: inline-flex; }
+.date-picker-pop.is-time { width: 268px; }
+/* Start/End switch. Shows the time already chosen for that end so switching back
+   does not hide the previous choice. */
+.time-range-seg { display: flex; gap: 6px; padding: 8px 10px 0; }
+.time-range-seg button {
+  flex: 1; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--bg); color: var(--text); font: inherit; font-size: 12px;
+  cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.time-range-seg button:hover { background: var(--green-soft); }
+.time-range-seg button.is-on {
+  background: var(--green); border-color: var(--green); color: var(--white); font-weight: 600;
+}
+.date-picker-pop.is-time .time-picker { border-top: 0; }
+
+.toolbar-filters select {
+  height: 38px; padding: 0 30px 0 12px; font-size: 13.5px;
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: 999px; color: var(--text); cursor: pointer;
+}
+.toolbar-filters select:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 3px var(--green-ring); }
+.toolbar-actions { display: flex; gap: 8px; align-items: center; margin-left: auto; }
+
+/* Filter pill: a chip trigger with a floating menu, in place of a native select.
+   The menu is lifted with a shadow rather than a border so it reads as floating. */
+.filter-pill { position: relative; }
+
+.filter-pill-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  height: 34px; padding: 0 10px 0 14px;
+  background: var(--white); border: 1px solid var(--border); border-radius: 999px;
+  color: var(--text); font: inherit; font-size: 13.5px; cursor: pointer; white-space: nowrap;
+}
+.filter-pill-btn:hover { background: var(--green-soft); }
+.filter-pill-btn:focus-visible { outline: none; border-color: var(--green); box-shadow: 0 0 0 3px var(--green-ring); }
+.filter-pill-label { max-width: 190px; overflow: hidden; text-overflow: ellipsis; }
+.filter-pill-chevron { flex: none; transition: transform .15s ease; }
+.filter-pill-btn[aria-expanded='true'] .filter-pill-chevron { transform: rotate(180deg); }
+
+/* Active filter: the pill fills with the brand green so a set filter reads as set
+   at a glance, and the label flips to white for contrast. */
+.filter-pill-btn.is-active {
+  background: var(--green); border-color: var(--green); color: var(--white);
+}
+.filter-pill-btn.is-active:hover { background: var(--green-dark); border-color: var(--green-dark); }
+
+/* Form variant: matches the surrounding .field inputs (9px corners, 14px text,
+   full column width) instead of the rounded toolbar pill, and never fills green
+   because a filled form field would read as an active filter. */
+.filter-pill.is-field { width: 100%; }
+.filter-pill-btn.is-field {
+  width: 100%; height: auto; min-height: 39px;
+  justify-content: space-between; gap: 8px;
+  padding: 10px 12px; border-radius: 9px;
+  font-size: 14px; text-align: left; white-space: normal;
+}
+.filter-pill-btn.is-field:hover:not(:disabled) { background: var(--white); border-color: var(--green); }
+.filter-pill-btn.is-field .filter-pill-label { max-width: none; flex: 1 1 auto; min-width: 0; }
+.filter-pill-btn.is-field .filter-pill-chevron { color: var(--muted); }
+.filter-pill-label.is-placeholder { color: var(--muted); }
+
+/* Companion to the form-variant pill for a field that accepts a hand-typed value:
+   the same height, border and corner radius as .filter-pill-btn.is-field so the
+   control does not change size when the pill is swapped for the text box. */
+.custom-option {
+  display: flex; align-items: center; gap: 6px;
+  /* No left padding: the box carries the same border and radius as a normal field, so
+     the text starts where every other input's text starts rather than a step in. */
+  min-height: 39px; padding: 0 8px 0 0;
+  background: var(--white); border: 1px solid var(--border); border-radius: 9px;
+}
+.custom-option:focus-within { border-color: var(--green); box-shadow: 0 0 0 3px var(--green-ring); }
+.custom-option input {
+  flex: 1 1 auto; min-width: 0; height: 37px;
+  border: 0; background: transparent; padding: 0; font: inherit; font-size: 14px;
+}
+.custom-option input:focus { outline: none; }
+.custom-option input[aria-invalid='true'] { color: var(--danger); }
+/* The message sits outside the box, under it, in its own wrapper. Putting it inside as a
+   wrapping flex child forced a line break between the input and its buttons, so a
+   rejected entry pushed cancel onto a row of its own. */
+.custom-option-wrap { display: block; }
+.custom-option-error {
+  display: block; font-size: 12px; color: var(--danger); padding: 4px 0 0 2px;
+}
+.custom-option .muted { font-size: 14px; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 45%; }
+
+.filter-pill-btn:disabled,
+.filter-pill.is-disabled .filter-pill-btn {
+  background: #f6f7f9; border-color: var(--border); color: var(--muted);
+  cursor: not-allowed; opacity: 1;
+}
+.filter-pill-btn:disabled .filter-pill-chevron { color: #9ca3af; }
+
+/* Filter pill menu. Fixed rather than absolute because it is portalled to <body> and
+   positioned from measured coordinates, which also keeps it out of the clipping
+   chain of .modal-body and .table-wrap. */
+.filter-pill-menu {
+  position: fixed; z-index: 90;
+  max-height: 260px; overflow-y: auto;
+  padding: 6px; background: var(--white); border-radius: 12px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, .12), 0 2px 6px rgba(15, 23, 42, .06);
+}
+
+.filter-pill-option {
+  display: block; width: 100%; text-align: left; white-space: nowrap;
+  padding: 9px 12px; border: 0; border-radius: 8px; background: transparent;
+  font: inherit; font-size: 13.5px; color: var(--text); cursor: pointer;
+}
+.filter-pill-option:hover { background: var(--green-soft); }
+.filter-pill-option.is-selected { color: var(--green-dark); font-weight: 700; }
+
+/* A maintained list's rows carry a ✕ beside the entry rather than inside it. The row is
+   the flex parent so the entry keeps the full width of the menu minus the button, and
+   the two hover states stay separate so reaching for the ✕ does not look like picking
+   the entry. The ✕ itself is hidden until the row is approached, so the list reads as a
+   plain list to anyone not curating it. */
+.filter-pill-option-row {
+  display: flex; align-items: center; gap: 2px;
+  border-radius: 8px;
+}
+.filter-pill-option-row .filter-pill-option { flex: 1 1 auto; min-width: 0; }
+.filter-pill-remove {
+  flex: 0 0 auto;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px;
+  border: 0; border-radius: 7px; background: transparent;
+  color: #9ca3af; cursor: pointer;
+  opacity: 0; transition: opacity .12s ease, background .12s ease, color .12s ease;
+}
+.filter-pill-option-row:hover .filter-pill-remove,
+.filter-pill-remove:focus-visible { opacity: 1; }
+.filter-pill-remove:hover { background: #fef2f2; color: #dc2626; }
+/* Shown without hovering for anyone driving the menu by keyboard, and on a touch
+   screen there is no hover to wait for. */
+@media (hover: none) { .filter-pill-remove { opacity: 1; } }
+.filter-pill-remove:focus-visible { outline: 2px solid var(--green); outline-offset: -1px; }
+
+/* Pill for the secondary toolbar controls. The border stays the same neutral gray as
+   the filter pills in rest and hover; only the fill and text change on hover. */
+.btn-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 38px; padding: 0 14px;
+  background: var(--white); border: 1px solid var(--border); border-radius: 999px;
+  color: var(--text); font: inherit; font-size: 13.5px; font-weight: 600;
+  cursor: pointer; white-space: nowrap;
+}
+.btn-pill:hover { border-color: var(--border); color: var(--green-dark); background: var(--green-soft); }
+.btn-pill:disabled { opacity: .6; cursor: not-allowed; }
+.btn-pill:disabled:hover { border-color: var(--border); color: var(--text); background: var(--white); }
+
+/* Export reads as a distinct action, so it tints red on hover instead of green. */
+.btn-pill-export:hover { color: var(--danger); background: var(--danger-soft); }
+.btn-pill-export:disabled:hover { color: var(--text); background: var(--white); }
+/* The generated file is offered as a visible link, since a click fired from
+   asynchronous code is not a user gesture and gets dropped by the browser. */
+.pdf-ready {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 14px; margin-bottom: 8px;
+  background: var(--green-soft); border: 1px solid var(--green); border-radius: 12px;
+  color: var(--green-dark); font-size: 13px;
+}
+.pdf-ready-text { font-weight: 600; }
+
+.toolbar-meta { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.record-count { margin: 0; font-size: 12.5px; color: var(--muted); }
+
+/* Each control sits under a visible caption. Previously the only name a filter had
+   was its "nothing chosen" placeholder text, which meant a control was
+   indistinguishable from a neighbouring one until it was opened. */
+.filters { display: flex; gap: 8px 10px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 8px; }
+.filters select, .filters input {
+  border: 1px solid var(--border); border-radius: 9px; padding: 8px 11px; background: var(--white);
+  font-size: 13.5px; color: var(--text);
+}
+.filters select:focus, .filters input:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 3px var(--green-ring); }
+.filter-field { display: flex; flex-direction: column; gap: 5px; position: relative; }
+.filter-label { font-size: 11.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+/* The pill is inline-flex and nowrap, so left to itself a short placeholder leaves a
+   column of dead space and the row reads as evenly spaced gaps rather than controls.
+   Stretching it to the column, with the label truncating, makes each control fill the
+   same slot and keeps the bar tidy at any label length. */
+.filters .filter-field { min-width: 130px; }
+.filters .filter-field .filter-pill,
+.filters .filter-field .filter-pill-btn { width: 100%; }
+.filters .filter-field .filter-pill-label {
+  font-size: 13.5px;
+  max-width: none; flex: 1 1 auto; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* Sectioned Add/Edit form. The borderless fieldset keeps the browser's default
+   grouping styling out of the way while still giving each group a heading. */
+.form-section { border: 0; padding: 0; margin: 0 0 18px; }
+.form-section:last-child { margin-bottom: 0; }
+.form-section > legend {
+  padding: 0 0 9px; font-size: 11.5px; font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase; color: var(--green);
+}
+
+/* ---------- Modal ---------- */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(15, 23, 42, .5); backdrop-filter: blur(2px);
+  display: flex; align-items: flex-start; justify-content: center; padding: 48px 16px; z-index: 50;
+  overflow-y: auto;
+}
+/* Scrollbars: thick green pill thumb, no arrow buttons, on EVERY scrollable box.
+
+   This was a hand-maintained list of eight class names, which silently missed the
+   two cases that mattered most. The page scrollbar belongs to <html> — body never
+   scrolls — so styling `body` left the main window scrollbar native on every page.
+   And .time-picker-list, the scrollable time list inside the Add/Edit Program form,
+   was absent from the list entirely, so that one was always the Windows chevron
+   bar. Matching `*` retires the list: one-off overflow:auto containers added later
+   inherit the custom bar with no stylesheet edit, and there is nothing to keep in
+   sync or forget.
+
+   The standard properties must stay Firefox-only. Chrome 121+ implements
+   scrollbar-width / scrollbar-color, and setting either makes it drop every
+   ::-webkit-scrollbar-* rule, which resurrects the native thin scrollbar with
+   chevrons. -moz-appearance is Firefox-only, so it reliably scopes the fallback. */
+@supports (-moz-appearance: none) {
+  html,
+  * {
+    scrollbar-color: var(--green) transparent;
+    scrollbar-width: auto;
+  }
+}
+
+*::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+  -webkit-appearance: none;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Where a horizontal and vertical bar meet, Chrome fills the corner with the
+   default grey; .table-wrap scrolls on both axes, so keep it clear. */
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Windows Chrome paints chevron buttons unless every button pseudo-element is
+   suppressed, so the base, single-button, and directional variants all go. */
+*::-webkit-scrollbar-button,
+*::-webkit-scrollbar-button:single-button,
+*::-webkit-scrollbar-button:vertical:decrement,
+*::-webkit-scrollbar-button:vertical:increment,
+*::-webkit-scrollbar-button:horizontal:decrement,
+*::-webkit-scrollbar-button:horizontal:increment {
+  display: none;
+  width: 0;
+  height: 0;
+  background: transparent;
+  -webkit-appearance: none;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--green);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--green-dark);
+  background-clip: padding-box;
+}
+/* The dialog is a flex column with a capped height: only the body scrolls, so the
+    footer buttons stay visible no matter how long the content grows. */
+.modal {
+  background: var(--white); border-radius: 16px; width: 100%; max-width: 580px;
+  box-shadow: var(--shadow-lg);
+  display: flex; flex-direction: column; max-height: calc(100vh - 96px);
+}
+.modal.modal-lg { max-width: 800px; }
+.modal.modal-side {
+  max-width: 480px;
+  height: calc(100vh - 96px);
+  max-height: calc(100vh - 96px);
+  border-radius: 0 16px 16px 0;
+  margin-left: auto;
+}
+@media (max-width: 640px) {
+  .modal.modal-side {
+    max-width: 100%;
+    border-radius: 0 0 16px 16px;
+    margin-left: 0;
+  }
+}
+.modal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 20px 14px; flex: none;
+}
+.modal-head h3 { margin: 0; font-size: 16px; font-weight: 700; }
+.modal-body { padding: 6px 20px 20px; overflow-y: auto; flex: 1 1 auto; min-height: 0; }
+.modal-foot {
+  padding: 14px 20px; border-top: 1px solid var(--border);
+  display: flex; justify-content: flex-end; gap: 8px;
+  flex: none; background: var(--white); border-radius: 0 0 16px 16px;
+}
+
+/* ---------- Detail view (View modal) ---------- */
+.detail-view p { margin: 0 0 10px; line-height: 1.5; }
+.detail-view .pre-line { white-space: pre-line; }
+
+/* ---------- Beneficiary profile (scoped to the details modal) ---------- */
+.record-profile section {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+/* The header's own bottom border already separates it from the first section,
+   so the first section must not draw a second divider. */
+.record-profile section:first-of-type {
+  margin-top: 20px;
+  padding-top: 0;
+  border-top: none;
+}
+
+/* Sections are grouped by a divider and an icon, never by a tinted fill, so the
+   modal keeps one white surface throughout. */
+.profile-section-title {
+  display: flex; align-items: center; gap: 7px;
+  margin: 0 0 12px; font-size: 11.5px; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--muted);
+}
+.profile-section-title svg { flex: none; }
+
+.profile-head {
+  display: flex; align-items: center; gap: 14px;
+  padding-bottom: 18px; border-bottom: 1px solid var(--border);
+}
+.profile-identity { min-width: 0; }
+.profile-name { margin: 0 0 2px; font-size: 17px; font-weight: 700; color: var(--green-dark); }
+.profile-sub { margin: 0 0 8px; font-size: 12.5px; color: var(--muted); }
+.profile-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.details-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; }
+.detail-item { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.detail-item.is-wide { grid-column: 1 / -1; }
+.detail-item.is-wide .detail-value ul { margin: 4px 0 0 18px; padding: 0; }
+.detail-label { font-size: 11.5px; color: var(--muted); font-weight: 600; }
+.detail-value { font-size: 14px; color: var(--text); overflow-wrap: anywhere; }
+
+/* One entry in the advisory publication history: badge, when, by whom, reach. */
+.publish-event { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; }
+
+.modal-footer-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+
+/* Validation message shown under a field. */
+.field .error { font-size: 12px; color: var(--red, #dc2626); font-weight: 600; }
+.field .hint { font-size: 12px; color: var(--muted); }
+
+/* ReadOnlyField: the value sits in a disabled-looking box that matches the
+   surrounding .field inputs (9px corners, 14px text, same padding), with the lock
+   on the right signalling it cannot be edited. The helper line below keeps the
+   same rhythm as a Field hint. */
+.readonly-field {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  border: 1px solid var(--border); border-radius: 9px; padding: 10px 12px;
+  min-height: 42px; background: #f3f4f6;
+}
+.readonly-field-value { font-size: 14px; color: var(--text); }
+.readonly-field-lock { color: var(--muted); flex: none; }
+.error { color: var(--red, #dc2626); }
+
+/* Password inputs get a reveal button pinned inside the field. The wrapper is
+   relative so the eye never takes a column of its own in the grid. */
+.password-input { position: relative; display: flex; width: 100%; }
+.password-input input { width: 100%; padding-right: 40px; }
+.password-toggle {
+  position: absolute; top: 50%; right: 6px; transform: translateY(-50%);
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border: none; background: transparent;
+  color: var(--muted); cursor: pointer; border-radius: 6px;
+}
+.password-toggle:hover { color: var(--text); }
+.password-toggle[aria-pressed='true'] { color: var(--green); }
+
+/* The live password checklist: each rule greys out until it is met, then turns
+   green. Deliberately compact so it can sit under a focused field. */
+.password-rules {
+  list-style: none; margin: 6px 0 0; padding: 0;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.password-rules li {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--muted);
+}
+.password-rules li.met { color: var(--green); }
+.password-rules li::before {
+  content: '○'; font-size: 11px; line-height: 1;
+}
+.password-rules li.met::before { content: '●'; }
+
+/* A checkbox is not a text input, so it keeps its native box and sizing. */
+.field input[type='checkbox'] {
+  width: 18px; height: 18px; padding: 0; align-self: flex-start; accent-color: var(--green);
+}
+
+/* Standalone checkbox rows (e.g. the "Send SMS …" toggle) wrap only the box and
+   its text: width: fit-content stops the label spanning the whole form row, so
+   the blank space to the right no longer toggles anything. */
+.check-label {
+  display: inline-flex; width: fit-content; gap: 8px;
+  font-size: 13.5px; cursor: pointer;
+}
+.check-label input[type='checkbox'] {
+  width: 18px; height: 18px; flex: none; accent-color: var(--green);
+}
+
+/* Rows that open the details modal. */
+.table tbody tr.clickable { cursor: pointer; }
+.table tbody tr.clickable:hover { background: var(--green-ring, #f1f7f2); }
+.table tbody tr.clickable:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
+
+/* ---------- Forms ---------- */
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 4px; }
+.field.col-2 { grid-column: span 2; }
+.field > span { font-size: 12.5px; color: var(--muted); font-weight: 600; }
+/* The Field component's label text is itself a real <label>, sized to its text
+   rather than the row, so a stray click on empty space cannot reach the control.
+   Clicking the text still focuses it via htmlFor. */
+.field-label {
+  display: inline-block; width: fit-content;
+  font-size: 12.5px; color: var(--muted); font-weight: 600; cursor: pointer;
+}
+.field input, .field select, .field textarea {
+  border: 1px solid var(--border); border-radius: 9px; padding: 10px 12px; background: var(--white);
+  color: var(--text); font-size: 14px;
+}
+.field textarea { resize: vertical; min-height: 80px; }
+.field input:focus, .field select:focus, .field textarea:focus,
+.filters select:focus, .filters input:focus {
+  outline: none; border-color: var(--green); box-shadow: 0 0 0 3px var(--green-ring);
+}
+
+/* Every form control gets the same green outline on hover, so text inputs,
+   textareas, native selects and the custom .filter-pill-btn fields all react
+   the same way. Before this, only the pills highlighted on hover while plain
+   inputs stayed inert until focus. Focus keeps the ring above. */
+.field input:hover:not([type='checkbox']):not(:disabled),
+.field select:hover:not(:disabled),
+.field textarea:hover:not(:disabled),
+.filters select:hover:not(:disabled),
+.filters input:hover:not(:disabled),
+.search-pill:hover,
+.chat-input input:hover:not(:disabled) {
+  border-color: var(--green);
+}
+
+/* ---------- Chat ---------- */
+.chat-shell { display: flex; flex-direction: column; height: 68vh; background: var(--white); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+.chat-msgs { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; background: #fafbfc; }
+.chat-row { display: flex; }
+.chat-row.mine { justify-content: flex-end; }
+.bubble { max-width: 72%; padding: 10px 14px; border-radius: 14px; background: var(--white); border: 1px solid var(--border); line-height: 1.5; white-space: pre-wrap; font-size: 14px; }
+.chat-row.mine .bubble { background: var(--green); color: #fff; border-color: var(--green); }
+.chat-row .whom { font-size: 11px; color: var(--muted); margin: 4px 6px; }
+.chat-input { display: flex; gap: 10px; padding: 14px; border-top: 1px solid var(--border); }
+.chat-input input { flex: 1; border: 1px solid var(--border); border-radius: 9px; padding: 10px 12px; font-size: 14px; }
+.chat-input input:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 3px var(--green-ring); }
+
+/* ---------- Toast ---------- */
+.toast-host { position: fixed; top: 18px; right: 18px; z-index: 100; display: flex; flex-direction: column; gap: 8px; }
+.toast {
+  background: #0f172a; color: #fff; padding: 11px 16px; border-radius: 10px; font-size: 13.5px;
+  box-shadow: var(--shadow-lg); max-width: 320px; font-weight: 500;
+}
+.toast.ok { background: var(--green); }
+.toast.err { background: var(--danger); }
+.toast.info { background: #2563eb; }
+
+.section-gap { margin-top: 22px; }
+.muted { color: var(--muted); }
+
+/* Connection banner (Layout top) and form resilience pieces. The amber banner
+   is informational only; it never blocks reading, only form submits are gated
+   on the same connection state. */
+.conn-banner {
+  padding: 9px 18px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  text-align: center;
+  border-bottom: 1px solid transparent;
+}
+.conn-banner.off { background: #fef3c7; color: #92400e; border-color: #fcd34d; }
+.conn-banner.ok  { background: var(--green-soft); color: var(--green-dark); border-color: var(--green); }
+
+.draft-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 0 0 14px;
+  padding: 8px 12px;
+  border: 1px dashed #f6c453;
+  background: #fffbeb;
+  color: #92400e;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  margin-left: auto;
+  color: var(--green-dark);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.link-btn:hover { opacity: .8; }
+
+.form-error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  background: var(--danger-soft);
+  border: 1px solid #fca5a5;
+  color: #991b1b;
+  border-radius: 8px;
+  font-size: 13.5px;
+}
+.form-error em { flex-basis: 100%; font-size: 12px; margin-left: 0; }
+
+.form-alert {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13.5px;
+}
+.form-alert.is-danger { background: var(--danger-soft); border: 1px solid #fca5a5; color: #991b1b; }
+.form-alert.is-info { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; }
+.form-alert-title { font-weight: 700; margin-bottom: 4px; }
+.form-alert p { margin: 0 0 6px; }
+.form-alert-existing { margin-bottom: 8px !important; }
+.form-alert .btn { margin-top: 2px; }
+.field.error input, .field.error select, .field.error textarea,
+.field.error .filter-pill-btn, .field.error .type-multi-btn { border-color: #dc2626; }
+.text-right { text-align: right; }
+.flex { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.field-col2 { grid-column: span 2; }
+@media (max-width: 700px) { .grid2 { grid-template-columns: 1fr; } }
+
+.slide-thumb { width: 64px; height: 44px; border-radius: 8px; object-fit: cover; display: block; }
+.slide-thumb-ph {
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-weight: 800; font-size: 18px;
+}
+
+/* Valid-ID document in the beneficiary detail modal: a thumbnail that opens the
+   full image in a new tab. */
+.id-doc-link { display: inline-flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.id-doc-thumb {
+  max-width: 240px; max-height: 160px; border-radius: 8px;
+  border: 1px solid #e5e7eb; object-fit: cover; display: block;
+}
+
+@media (max-width: 860px) {
+  /* The sidebar becomes a drawer: fixed at the viewport's left and translated off
+     screen until the header burger opens it. Fixed positioning takes it out of
+     flow, so content runs edge to edge behind it. visibility stays hidden while
+     closed so nothing inside can be tabbed to or painted during the transition. */
+  .sidebar {
+    position: fixed; top: 0; left: 0; height: 100vh; width: 236px;
+    z-index: 85;
+    transform: translateX(-100%);
+    transition: transform .22s ease, visibility 0s .22s;
+    visibility: hidden;
+  }
+  .sidebar.open {
+    transform: translateX(0); visibility: visible;
+    transition: transform .22s ease, visibility 0s;
+  }
+  .sidebar-backdrop {
+    position: fixed; inset: 0; z-index: 84;
+    background: rgba(2, 6, 23, .45);
+    animation: fade-in .2s ease;
+  }
+  @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+  .content { padding: 20px 16px 36px; }
+  .app-bar { margin: -20px -16px 0; padding: 0 16px; }
+  .form-grid, .details-grid { grid-template-columns: 1fr; }
+  /* A short viewport leaves almost no room around the dialog, so the backdrop
+     padding shrinks and the modal takes the full remaining height. */
+  .modal-backdrop { padding: 12px; }
+  .modal { max-height: calc(100vh - 24px); }
+  .modal-footer-actions { width: 100%; }
+  .modal-footer-actions .btn { flex: 1 1 auto; }
+}
+
+
+/* ---------- Brand motif ---------- */
+/* Original "circuit tree" illustration, fixed to the bottom-right corner.
+   z-index -1 puts it in the negative stacking layer: it paints above the page
+   background but behind every card, table, badge and button. pointer-events is
+   off so it can never intercept a click, and being fixed + out of flow it adds
+   no height and never scrolls. */
+/* Decorative bottom-right background mark. The PNG is square and transparent at
+   the corners, so only the width is set; the height follows from the aspect
+   ratio. z-index -1 keeps it behind the cards, and pointer-events none keeps it
+   from swallowing clicks on whatever sits under it.
+
+   `bottom` is pushed well past the viewport edge on purpose: the artwork is a
+   tree whose trunk occupies roughly the bottom 14% of the square, so letting
+   about a sixth of the box hang below the fold leaves only a short stub of trunk
+   showing and lets the canopy sit inside the page. */
+.brand-motif {
+    position: fixed;
+    right: -56px;
+    bottom: -65px;
+    width: 380px;
+    z-index: -1;
+    pointer-events: none;
+    opacity: .07;
+    user-select: none;
+  }
+  .brand-motif img { display: block; width: 100%; height: auto; }
+
+.btn.lg { padding: 12px 16px; min-height: 44px; font-size: 14px; }
+.text-badge { font-weight: 600; font-size: 13px; }
+.text-gray { color: #475569; }
+.text-green { color: #16a34a; }
+.text-amber { color: #ca8a04; }
+.text-blue { color: #2563eb; }
+.text-red { color: #b91c1c; }
+.text-purple { color: #7c3aed; }
+.text-teal { color: #0f766e; }
+.text-sky { color: #0369a1; }
+.text-plum { color: #a21caf; }
+
+/* Breathing dot on the ongoing lifecycle badge; the text colour of the badge is
+   the dot colour too (currentColor), so no per-tone styles are needed. */
+.pulse-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 6px;
+  vertical-align: 1px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pulse-dot 1.6s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: .35; }
+  50% { opacity: 1; }
+}
+
+/* Small draft chip shown beside a title when the row is unpublished. */
+.draft-pill {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+  color: #78350f;
+  font-size: 11px;
+  font-weight: 700;
+  vertical-align: 2px;
+  letter-spacing: .03em;
+}
+
+/* ---------- Target type multi-select ----------
+   The trigger matches the surrounding .field inputs (9px corners, 14px text, full
+   column width) rather than the rounded toolbar pill, for the same reason
+   FilterPill's `is-field` variant does: a filled or heavily rounded form control
+   reads as an active filter instead of a field. */
+.type-multi { position: relative; }
+.type-multi-btn {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  width: 100%; min-height: 39px; padding: 7px 12px;
+  background: var(--white); border: 1px solid var(--border); border-radius: 9px;
+  color: var(--text); font: inherit; font-size: 14px; text-align: left; cursor: pointer;
+}
+.type-multi-btn:hover:not([aria-disabled='true']) { border-color: var(--green); }
+.type-multi-btn:focus-visible {
+  outline: none; border-color: var(--green); box-shadow: 0 0 0 3px var(--green-ring);
+}
+/* The trigger is a role="button" div (it hosts the chip remove buttons), so the
+   disabled state is expressed with aria-disabled rather than :disabled. */
+.type-multi-btn[aria-disabled='true'] { background: #f6f7f9; color: var(--muted); cursor: not-allowed; }
+.type-multi-btn[aria-disabled='true']:hover { border-color: var(--border); }
+.type-multi-btn .filter-pill-chevron { flex: none; color: var(--muted); }
+.type-multi-btn[aria-expanded='true'] .filter-pill-chevron { transform: rotate(180deg); }
+.type-multi-placeholder { color: var(--muted); }
+
+/* Chip row wraps rather than scrolls: with three types plus "All" a single line
+   would overflow the field, and a hidden selection is the one thing this control
+   must not do. */
+.type-multi-chips { display: flex; flex-wrap: wrap; gap: 6px; flex: 1 1 auto; min-width: 0; }
+.chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 5px 3px 9px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 600; line-height: 1.3;
+}
+/* Tinted to match the per-type badge hues used elsewhere, so the same type is
+   never shown in two different colours in two different places. */
+.chip-all { background: #f1f5f9; color: #475569; }
+.chip-farmer { background: #dcece3; color: #126242; }
+.chip-fisherfolk { background: #dbeafe; color: #1d4ed8; }
+.chip-livestock_owner { background: #fef3c7; color: #b45309; }
+/* 'public' = visitors who are not registered beneficiaries, so it takes the one
+   hue none of the registered groups use (purple, matching .text-purple). */
+.chip-public { background: #ede9fe; color: #6d28d9; }
+.chip-x {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 17px; height: 17px; padding: 0; border: 0; border-radius: 999px;
+  background: transparent; color: inherit; cursor: pointer; opacity: .65;
+}
+.chip-x:hover:not(:disabled) { background: rgba(15, 23, 42, .1); opacity: 1; }
+.chip-x:disabled { opacity: .3; cursor: not-allowed; }
+
+/* The menu rows are checkboxes, not buttons, so they lay out as a label. The
+   native box is kept (it is keyboard- and screen-reader-correct for free) but
+   restyled to sit inline with the text at the field's font size. */
+.type-multi-option {
+  display: flex; align-items: center; gap: 9px;
+  white-space: nowrap; cursor: pointer; font-weight: 400;
+}
+.type-multi-option.is-selected { color: var(--green-dark); font-weight: 600; }
+.type-multi-option input[type='checkbox'] {
+  width: 15px; height: 15px; margin: 0; flex: none; accent-color: var(--green); cursor: pointer;
+}
+
+/* Target audience in a table cell: badges sit side by side with a small gap
+   instead of the inline run-on that text badges produce on their own. */
+.target-badges { display: inline-flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+
+/* ---- Reports: toggle chips and table paging ---- */
+/* A report form option that behaves like a checkbox, so it needs button chrome
+   and a pressed state the unstyled `.chip` (which is only a label) does not have. */
+.chip-btn {
+  cursor: pointer; border: 1px solid var(--border);
+  font: inherit; font-size: 12.5px; font-weight: 600; padding: 5px 12px;
+}
+.chip-btn:hover { border-color: var(--green); color: var(--green-dark); }
+.chip-btn.chip-on {
+  background: var(--green-soft); color: var(--green-dark);
+  border-color: var(--green); box-shadow: 0 0 0 1px var(--green) inset;
+}
+.chip-btn.chip-on:hover { background: var(--green-soft); }
+
+/* Paging sits under the table and keeps the row count visible while paging, so a
+   long report never looks like it has been silently truncated. */
+.pager { display: flex; align-items: center; gap: 10px; justify-content: flex-end; margin-top: 12px; flex-wrap: wrap; }
+.pager .count { color: var(--muted); font-size: 12.5px; margin-right: auto; }
+.pager .page-now { color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+
+/* Touch input has no hover and a coarse pointer, so every tappable control keeps
+   a 44px target. The size is added inside the control (a larger native box or a
+   taller min-height) rather than by stretching its row, so the click-area rules
+   stay intact: the blank space beside a control remains inert. */
+@media (hover: none) and (pointer: coarse) {
+  .field input[type='checkbox'],
+  .check-label input[type='checkbox'],
+  .type-multi-option input[type='checkbox'],
+  .dup-confirm input[type='checkbox'] { width: 24px; height: 24px; }
+
+  .check-label { min-height: 44px; }
+
+  .btn, .btn-pill, .filter-pill-btn, .type-multi-btn, .chip-btn, .icon-btn { min-height: 44px; }
+  .icon-btn { min-width: 44px; }
+
+  .filter-pill-option, .type-multi-option, .time-picker-item { min-height: 44px; }
+  .filter-pill-option { display: flex; align-items: center; }
+}

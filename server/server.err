@@ -1,0 +1,114 @@
+HttpError: From must be a valid date
+    at buildFilter (file:///C:/Users/Acer/OneDrive/Desktop/ACM-Final/server/src/routes/reports.js:62:15)
+    at file:///C:/Users/Acer/OneDrive/Desktop/ACM-Final/server/src/routes/reports.js:379:29
+    at file:///C:/Users/Acer/OneDrive/Desktop/ACM-Final/server/src/lib/utils.js:2:65
+    at Layer.handle [as handle_request] (C:\Users\Acer\OneDrive\Desktop\ACM-Final\server\node_modules\express\lib\router\layer.js:95:5)
+    at next (C:\Users\Acer\OneDrive\Desktop\ACM-Final\server\node_modules\express\lib\router\route.js:149:13)
+    at file:///C:/Users/Acer/OneDrive/Desktop/ACM-Final/server/src/middleware/auth.js:87:5
+    at Layer.handle [as handle_request] (C:\Users\Acer\OneDrive\Desktop\ACM-Final\server\node_modules\express\lib\router\layer.js:95:5)
+    at next (C:\Users\Acer\OneDrive\Desktop\ACM-Final\server\node_modules\express\lib\router\route.js:149:13)
+    at attachAccount (file:///C:/Users/Acer/OneDrive/Desktop/ACM-Final/server/src/middleware/auth.js:71:10)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5) {
+  status: 400,
+  details: null
+}
+HttpError: Please correct the highlighted fields
+    at file:///C:/Users/Acer/OneDrive/Desktop/ACM-Final/server/src/routes/reports.js:418:41
+    at file:///C:/Users/Acer/OneDrive/Desktop/ACM-Final/server/src/lib/utils.js:2:65
+    at Layer.handle [as handle_request] (C:\Users\Acer\OneDrive\Desktop\ACM-Final\server\node_modules\express\lib\router\layer.js:95:5)
+    at next (C:\Users\Acer\OneDrive\Desktop\ACM-Final\server\node_modules\express\lib\router\route.js:149:13)
+    at file:///C:/Users/Acer/OneDrive/Desktop/ACM-Final/server/src/middleware/auth.js:87:5
+    at Layer.handle [as handle_request] (C:\Users\Acer\OneDrive\Desktop\ACM-Final\server\node_modules\express\lib\router\layer.js:95:5)
+    at next (C:\Users\Acer\OneDrive\Desktop\ACM-Final\server\node_modules\express\lib\router\route.js:149:13)
+    at attachAccount (file:///C:/Users/Acer/OneDrive/Desktop/ACM-Final/server/src/middleware/auth.js:71:10)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5) {
+  status: 400,
+  details: {
+    barangay: 'Barangay is required',
+    farmer_name: "Farmer's Name is required",
+    activity: 'Select at least one activity',
+    medicine_used: 'Medicine Used is required',
+    species: 'Species is required',
+    age_value: 'Age is required',
+    age_unit: 'Age Unit is required',
+    no_of_heads: 'No. of Heads is required',
+    treated_by: 'Treated By is required'
+  }
+}
+HttpError: Please correct the highlighted fields
+    at file:///C:/Users/Acer/OneDrive/Desktop/ACM-Final/server/src/routes/reports.js:418:41
+    at file:///C:/Users/Acer/OneDrive/Desktop/ACM-Final/server/src/lib/utils.js:2:65
+    at Layer.handle [as handle_request] (C:\Users\Acer\OneDrive\Desktop\ACM-Final\server\node_modules\express\lib\router\layer.js:95:5)
+    at next (C:\Users\Acer\OneDrive\Desktop\ACM-Final\server\node_modules\express\lib\router\route.js:149:13)
+    at file:///C:/Users/Acer/OneDrive/Desktop/ACM-Final/server/src/middleware/auth.js:87:5
+    at Layer.handle [as handle_request] (C:\Users\Acer\OneDrive\Desktop\ACM-Final\server\node_modules\express\lib\router\layer.js:95:5)
+    at next (C:\Users\Acer\OneDrive\Desktop\ACM-Final\server\node_modules\express\lib\router\route.js:149:13)
+    at attachAccount (file:///C:/Users/Acer/OneDrive/Desktop/ACM-Final/server/src/middleware/auth.js:71:10)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5) {
+  status: 400,
+  details: { species: 'Species is not a valid choice' }
+}
+HttpError: Please correct the highlighted fields
+    at file:///C:/Users/Acer/OneDrive/Desktop/ACM-Final/server/src/routes/reports.js:418:41
+    at file:///C:/Users/Acer/OneDrive/Desktop/ACM-Final/server/src/lib/utils.js:2:65
+    at Layer.handle [as handle_request] (C:\Users\Acer\OneDrive\Desktop\ACM-Final\server\node_modules\express\lib\router\layer.js:95:5)
+    at next (C:\Users\Acer\OneDrive\Desktop\ACM-Final\server\node_modules\express\lib\router\route.js:149:13)
+    at file:///C:/Users/Acer/OneDrive/Desktop/ACM-Final/server/src/middleware/auth.js:87:5
+    at Layer.handle [as handle_request] (C:\Users\Acer\OneDrive\Desktop\ACM-Final\server\node_modules\express\lib\router\layer.js:95:5)
+    at next (C:\Users\Acer\OneDrive\Desktop\ACM-Final\server\node_modules\express\lib\router\route.js:149:13)
+    at attachAccount (file:///C:/Users/Acer/OneDrive/Desktop/ACM-Final/server/src/middleware/auth.js:71:10)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5) {
+  status: 400,
+  details: { barangay: 'Barangay is not a valid choice' }
+}
+HttpError: Please correct the highlighted fields
+    at file:///C:/Users/Acer/OneDrive/Desktop/ACM-Final/server/src/routes/reports.js:418:41
+    at file:///C:/Users/Acer/OneDrive/Desktop/ACM-Final/server/src/lib/utils.js:2:65
+    at Layer.handle [as handle_request] (C:\Users\Acer\OneDrive\Desktop\ACM-Final\server\node_modules\express\lib\router\layer.js:95:5)
+    at next (C:\Users\Acer\OneDrive\Desktop\ACM-Final\server\node_modules\express\lib\router\route.js:149:13)
+    at file:///C:/Users/Acer/OneDrive/Desktop/ACM-Final/server/src/middleware/auth.js:87:5
+    at Layer.handle [as handle_request] (C:\Users\Acer\OneDrive\Desktop\ACM-Final\server\node_modules\express\lib\router\layer.js:95:5)
+    at next (C:\Users\Acer\OneDrive\Desktop\ACM-Final\server\node_modules\express\lib\router\route.js:149:13)
+    at attachAccount (file:///C:/Users/Acer/OneDrive/Desktop/ACM-Final/server/src/middleware/auth.js:71:10)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5) {
+  status: 400,
+  details: { no_of_heads: 'No. of Heads must be a whole number of at least 1' }
+}
+HttpError: That user cannot be recorded as treating staff
+    at assertReferences (file:///C:/Users/Acer/OneDrive/Desktop/ACM-Final/server/src/routes/reports.js:266:25)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async file:///C:/Users/Acer/OneDrive/Desktop/ACM-Final/server/src/routes/reports.js:419:3 {
+  status: 400,
+  details: { field: 'treated_by' }
+}
+HttpError: Please correct the highlighted fields
+    at file:///C:/Users/Acer/OneDrive/Desktop/ACM-Final/server/src/routes/reports.js:418:41
+    at file:///C:/Users/Acer/OneDrive/Desktop/ACM-Final/server/src/lib/utils.js:2:65
+    at Layer.handle [as handle_request] (C:\Users\Acer\OneDrive\Desktop\ACM-Final\server\node_modules\express\lib\router\layer.js:95:5)
+    at next (C:\Users\Acer\OneDrive\Desktop\ACM-Final\server\node_modules\express\lib\router\route.js:149:13)
+    at file:///C:/Users/Acer/OneDrive/Desktop/ACM-Final/server/src/middleware/auth.js:87:5
+    at Layer.handle [as handle_request] (C:\Users\Acer\OneDrive\Desktop\ACM-Final\server\node_modules\express\lib\router\layer.js:95:5)
+    at next (C:\Users\Acer\OneDrive\Desktop\ACM-Final\server\node_modules\express\lib\router\route.js:149:13)
+    at attachAccount (file:///C:/Users/Acer/OneDrive/Desktop/ACM-Final/server/src/middleware/auth.js:71:10)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5) {
+  status: 400,
+  details: { activity: 'Enter the activity name, or choose a listed activity' }
+}
+HttpError: Record not found
+    at file:///C:/Users/Acer/OneDrive/Desktop/ACM-Final/server/src/routes/reports.js:444:27
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5) {
+  status: 404,
+  details: null
+}
+HttpError: Record not found
+    at file:///C:/Users/Acer/OneDrive/Desktop/ACM-Final/server/src/routes/reports.js:480:35
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5) {
+  status: 404,
+  details: null
+}
+HttpError: You can only edit records you created
+    at file:///C:/Users/Acer/OneDrive/Desktop/ACM-Final/server/src/routes/reports.js:455:26
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5) {
+  status: 403,
+  details: null
+}

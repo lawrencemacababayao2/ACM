@@ -1,0 +1,23 @@
+{
+  "name": "acm-server",
+  "version": "1.0.0",
+  "description": "AgriConnect Medina API - Express + MariaDB",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "set-admin-mobile": "node scripts/set-admin-mobile.mjs",
+    "test:ratelimit": "node scripts/rate-limit-check.mjs"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^8.7.1",
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.11.0",
+    "openai": "^6.49.0"
+  }
+}

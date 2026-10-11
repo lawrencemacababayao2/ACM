@@ -1,0 +1,12 @@
+
+{
+  "scripts": {
+    "dev": "concurrently \"npm run backend\" \"npm run admin\" \"npm run mobile\" \"npm run landing\"",
+    "backend": "cd server && npm run start",
+    "admin": "cd web && npm run dev",
+    "landing":"cd landing-website && npm run dev"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5"
+  }
+}

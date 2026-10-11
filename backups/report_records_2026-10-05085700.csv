@@ -1,0 +1,5 @@
+id,category,commodity,quantity,unit,area_hectares,barangay,notes,report_date,created_at
+1,crop,Rice,4500.00,kg,2.50,Poblacion,Wet season harvest (partial),2026-08-15,2026-10-05 03:16:10
+2,crop,Corn,1200.00,kg,1.20,Hipaya,White corn,2026-08-20,2026-10-05 03:16:10
+3,livestock,Swine,35.00,heads,0.00,Kibungsod,Fatteners ready for sale,2026-08-18,2026-10-05 03:16:10
+4,fisheries,Tilapia,800.00,kg,0.00,Maan-og,Fish cage harvest,2026-08-22,2026-10-05 03:16:10

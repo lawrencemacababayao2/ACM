@@ -1,0 +1,15 @@
+-- Duplicate normalization report
+-- Database: acm
+-- Taken: 2026-10-08T03:45:35.453Z
+-- Columns backfilled: 5 row(s)
+--
+-- Each block lists the duplicate groups found per prospective unique index.
+-- Indexes without duplicate groups were created by this script; the rest were
+-- skipped and carry a TODO marker. Resolving the groups and re-running this
+-- script adds the remaining indexes.
+
+-- [uq_beneficiaries_rsbsa_normalized] index created
+-- [uq_beneficiaries_mobile_normalized] index created
+-- [uq_beneficiaries_name_birthday] index created
+-- [uq_users_email_normalized] index created
+-- [uq_users_mobile_normalized] index created
