@@ -16,8 +16,130 @@
 .chat-md code { background: #f0f2ef; padding: 0 0.3em; border-radius: 4px; font-size: 0.9em; }
 
 /* Language toggle (Bisaya / English) */
-.lang-toggle { border: 1px solid var(--line); border-radius: 999px; overflow: hidden; background: #fff; display: inline-flex; flex-shrink: 0; }
-.lang-toggle button { font-size: 12px; font-weight: 600; padding: 6px 10px; background: transparent; border: none; cursor: pointer; color: #5c6b57; white-space: nowrap; transition: background .2s, color .2s; }
-.lang-toggle button.active { background: var(--growth); color: #fff; }
-.lang-toggle.flex { flex: 1; width: 100%; }
-.lang-toggle.flex button { flex: 1; }
+.lang-toggle {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+  background: #fff;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.lang-toggle button {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #5c6b57;
+  white-space: nowrap;
+  transition: background .2s, color .2s;
+}
+.lang-toggle button.active {
+  background: var(--growth);
+  color: #fff;
+}
+.lang-toggle.flex {
+  flex: 1;
+  width: 100%;
+}
+.lang-toggle.flex button {
+  flex: 1;
+}
+
+/* Nav link styles - clean underline only */
+.nav-link {
+  font-size: 15px;
+  font-weight: 500;
+  padding: 8px 0;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  color: var(--paddy);
+  white-space: nowrap;
+  transition: color .2s, border-color .2s;
+}
+.nav-link:hover {
+  color: var(--growth-dark);
+  border-bottom-color: var(--growth);
+}
+.nav-link.active {
+  color: var(--growth-dark);
+  border-bottom-color: var(--growth);
+}
+
+/* Download button - compact */
+.download-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--growth);
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background .2s, transform .1s;
+}
+.download-btn:hover {
+  background: var(--growth-dark);
+  transform: translateY(-1px);
+}
+.download-btn:active {
+  transform: translateY(0);
+}
+
+/* Mobile toggle button */
+.mobile-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--paddy);
+  transition: background .2s;
+}
+.mobile-toggle:hover {
+  background: var(--growth-light);
+}
+
+/* Responsive: Desktop nav visible at >= 1100px */
+@media (min-width: 1100px) {
+  .desktop-nav {
+    display: flex !important;
+  }
+  .desktop-actions {
+    display: flex !important;
+  }
+}
+
+/* Below 1100px: hide desktop nav, show hamburger */
+@media (max-width: 1099px) {
+  .desktop-nav {
+    display: none !important;
+  }
+  .desktop-actions {
+    display: none !important;
+  }
+  .mobile-toggle {
+    display: inline-flex !important;
+  }
+}
+
+/* Ensure mobile drawer language toggle looks right */
+@media (max-width: 1099px) {
+  .lang-toggle.flex {
+    width: 100%;
+    justify-content: space-between;
+  }
+}

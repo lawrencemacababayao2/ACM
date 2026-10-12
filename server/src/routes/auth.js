@@ -529,12 +529,12 @@ router.post('/register', wrap(async (req, res) => {
   );
   if (dup) throw duplicateConflict(dup);
 
-  // The registrant's valid ID. Required: the MAO reviews it before verifying the
-  // account, so a registration without one cannot be acted on. The image is saved
-  // to disk and only its path is stored, like the profile photo. Checked after the
-  // duplicate guards so a rejected registration never leaves an orphan upload.
-  if (!idDocument || typeof idDocument !== 'string') {
-    const message = 'Please attach a photo of your valid ID.';
+// The registrant's RSBSA ID. Required: the MAO reviews it before verifying the
+// account, so a registration without one cannot be acted on. The image is saved
+// to disk and only its path is stored, like the profile photo. Checked after the
+// duplicate guards so a rejected registration never leaves an orphan upload.
+if (!idDocument || typeof idDocument !== 'string') {
+    const message = 'Please attach a photo of your RSBSA ID.';
     throw new HttpError(400, message, { field: 'id_document', errors: [{ field: 'id_document', message }] });
   }
   const idDocumentPath = saveDataUrlImage(idDocument, { prefix: 'id' });

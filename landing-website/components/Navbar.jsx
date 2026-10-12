@@ -4,12 +4,20 @@ import { NAV_STRUCTURE } from "../data";
 import { CHAT_PAGE } from "./ChatWidget";
 import { useLang } from "../src/lang";
 
+const APK_URL =
+  "https://github.com/lawrencemacababayao2/downloadapp/releases/latest/download/AgriConnectMedina.apk";
+
 export default function Navbar({ page, navigate }) {
   const { lang, setLang, bis } = useLang();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [activeHash, setActiveHash] = useState("about-content");
   const clickRef = useRef(false);
+
+  // Smaller menu text for Cebuano, since the labels are much longer
+  const isCebuano = lang === "bis";
+  const navFontSize = isCebuano ? 12 : 14;
+  const navGap = isCebuano ? 14 : 20;
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
@@ -19,8 +27,6 @@ export default function Navbar({ page, navigate }) {
 
   useEffect(() => {
     if (page !== "home") return;
-    // Only hash-scrolling items are observed: a hashless entry (Programs &
-    // Events, a whole page) never becomes the "current section".
     const hashes = NAV_STRUCTURE.filter((i) => i.hash).map((i) => i.hash);
     const els = hashes.map((h) => document.getElementById(h)).filter(Boolean);
     if (!els.length) return;
@@ -38,14 +44,12 @@ export default function Navbar({ page, navigate }) {
           }
         }
       },
-      { rootMargin: "-80px 0px -40% 0px", threshold: [0, 0.25, 0.5, 0.75, 1] }
+      { rootMargin: "-80px 0px -40% 0px", threshold: [0, 0.25, 0.5, 0.75, 1] },
     );
     els.forEach((el) => observer.observe(el));
     return () => observer.disconnect();
   }, [page]);
 
-  // Leaving home means no hash section is in view; the page item (if any)
-  // carries its own active state below.
   useEffect(() => {
     if (page !== "home") setActiveHash(null);
   }, [page]);
@@ -66,10 +70,10 @@ export default function Navbar({ page, navigate }) {
 
   const handleNavClick = (item) => {
     clickRef.current = true;
-    setTimeout(() => { clickRef.current = false; }, 800);
+    setTimeout(() => {
+      clickRef.current = false;
+    }, 800);
     closeMobile();
-    // A hashless nav item is a whole page (Programs & Events), so it navigates
-    // instead of scrolling.
     if (item.page && item.page !== "home") {
       setActiveHash(null);
       navigate(item.page);
@@ -84,89 +88,194 @@ export default function Navbar({ page, navigate }) {
     setActiveHash(item.hash);
   };
 
+  const isActive = (item) => {
+    if (item.hash) return activeHash === item.hash;
+    return page === item.page;
+  };
+
+  const isAskAIActive = page === CHAT_PAGE;
+
+  const goToChat = () => {
+    setActiveHash(null);
+    navigate(CHAT_PAGE);
+    closeMobile();
+  };
+
   return (
     <header
       className="fixed top-0 left-0 right-0 z-50 transition-all"
-      style={{ background: "#FFFFFF", borderBottom: scrolled ? "1px solid var(--line)" : "1px solid transparent", boxShadow: scrolled ? "0 4px 16px rgba(6,43,28,0.05)" : "none" }}
+      style={{
+        height: 72,
+        background: "#FFFFFF",
+        borderBottom: scrolled
+          ? "1px solid var(--line)"
+          : "1px solid transparent",
+        boxShadow: scrolled ? "0 4px 16px rgba(6,43,28,0.05)" : "none",
+      }}
     >
-      <div className="max-w-8xl mx-auto flex items-center justify-between gap-3 px-4 sm:px-6 md:px-8" style={{ height: 72 }}>
-        <button onClick={() => handleNavClick(NAV_STRUCTURE[0])} className="flex items-center gap-2.5 sm:gap-3 flex-shrink-0 min-w-0" style={{ background: "none", border: "none", cursor: "pointer" }}>
-          <div className="seal"><img src="./medina-official-seal.jpg" alt="Medina Municipal Seal" className="object-cover"/></div>
-          <div className="seal"><img src="./mao-seal.png" alt="MAO Seal" style={{ width: 48, height: "auto", maxWidth: "none" }}/></div>
-          <div className="leading-tight hidden sm:block text-left min-w-0">
-            <div className="font-bold text-[15px] sm:text-[16px] truncate" style={{ color: "var(--paddy)" }}>AgriConnect Medina</div>
-            <div className="text-[10px] tracking-wide hidden xl:block truncate" style={{ color: "#5c6b57" }}>{bis("MUNICIPAL AGRICULTURE OFFICE")}</div>
+      <div
+        className="mx-auto flex items-center justify-between gap-4 px-4 sm:px-6 lg:px-8"
+        style={{ height: 72 }}
+      >
+        {/* Logo + brand text (always visible from sm up) */}
+        <button
+          onClick={() => handleNavClick(NAV_STRUCTURE[0])}
+          className="flex items-center gap-2.5 shrink-0"
+          style={{ background: "none", border: "none", cursor: "pointer" }}
+        >
+          <div className="seal">
+            <img
+              src="./medina-official-seal.jpg"
+              alt="Medina Municipal Seal"
+              className="object-cover w-10 h-10"
+            />
+          </div>
+          <div className="seal">
+            <img
+              src="./mao-seal.png"
+              alt="MAO Seal"
+              className="w-10 h-10 object-contain"
+            />
+          </div>
+          <div className="leading-tight hidden sm:block text-left whitespace-nowrap">
+            <div
+              className="font-bold text-[15px]"
+              style={{ color: "var(--paddy)" }}
+            >
+              AgriConnect Medina
+            </div>
+            <div
+              className="text-[10px] tracking-wide"
+              style={{ color: "#5c6b57" }}
+            >
+              {bis("MUNICIPAL AGRICULTURE OFFICE")}
+            </div>
           </div>
         </button>
 
-        <nav className="hidden lg:flex items-center gap-4 xl:gap-6 flex-1 justify-center min-w-0 overflow-hidden">
+        {/* Desktop nav (1536px and up) */}
+        <nav
+          className="hidden 2xl:flex items-center flex-1 justify-center min-w-0"
+          style={{ gap: navGap }}
+        >
           {NAV_STRUCTURE.map((item) => (
             <button
               key={item.label}
               onClick={() => handleNavClick(item)}
-              className={`nav-link ${item.hash ? activeHash === item.hash : page === item.page ? "active" : ""}`}
+              className={`nav-link whitespace-nowrap shrink-0 ${isActive(item) ? "active" : ""}`}
+              style={{ fontSize: navFontSize }}
             >
               {bis(item.label)}
             </button>
           ))}
           <button
-            onClick={() => { setActiveHash(null); navigate(CHAT_PAGE); closeMobile(); }}
-            className={`nav-link ${page === CHAT_PAGE ? "active" : ""} flex items-center gap-1.5`}
+            onClick={goToChat}
+            className={`nav-link whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
+              isAskAIActive ? "active" : ""
+            }`}
+            style={{ fontSize: navFontSize }}
           >
-            <Bot size={15} /> {bis("Ask AI")}
+            <Bot size={isCebuano ? 13 : 15} /> {bis("Ask AI")}
           </button>
         </nav>
 
-        <div className="flex items-center gap-2 lg:gap-2.5 flex-shrink-0">
-            <div className="lang-toggle hidden md:flex" role="group" aria-label="Language">
-              <button className={lang === "bis" ? "active" : ""} onClick={() => setLang("bis")}>Cebuano</button>
-              <button className={lang === "en" ? "active" : ""} onClick={() => setLang("en")}>English</button>
-            </div>
-            <button className="btn-primary text-sm !px-3.5 sm:!px-5 flex items-center gap-2 btn-shimmer">
-            <Download size={16} /> {bis("Download App")}
-          </button>
-          <button className="lg:hidden p-2 -mr-2" onClick={() => setOpen(!open)} aria-label="Toggle navigation menu">
-            {open ? <X color="#062B1C" /> : <Menu color="#062B1C" />}
-          </button>
+        {/* Desktop actions (1536px and up) */}
+        <div className="hidden 2xl:flex items-center gap-3 shrink-0">
+          <div className="lang-toggle" role="group" aria-label="Language">
+            <button
+              className={lang === "bis" ? "active" : ""}
+              onClick={() => setLang("bis")}
+            >
+              Cebuano
+            </button>
+            <button
+              className={lang === "en" ? "active" : ""}
+              onClick={() => setLang("en")}
+            >
+              English
+            </button>
+          </div>
+          <a
+            href={APK_URL}
+            className="download-btn flex items-center gap-2 whitespace-nowrap no-underline"
+          >
+            <Download size={15} /> {bis("Download App")}
+          </a>
         </div>
+
+        {/* Hamburger: shown below 1536px */}
+        <button
+          className="2xl:hidden p-2 -mr-2 shrink-0"
+          onClick={() => setOpen(!open)}
+          aria-label="Toggle navigation menu"
+        >
+          {open ? <X color="#062B1C" /> : <Menu color="#062B1C" />}
+        </button>
       </div>
 
+      {/* Mobile drawer */}
       {open && (
-        <div className="lg:hidden px-5 pb-4 overflow-y-auto" style={{ background: "#fff", borderTop: "1px solid var(--line)", maxHeight: "calc(100vh - 72px)" }}>
+        <div
+          className="2xl:hidden px-4 pb-4 overflow-y-auto"
+          style={{
+            background: "#fff",
+            borderTop: "1px solid var(--line)",
+            maxHeight: "calc(100vh - 72px)",
+          }}
+        >
           <div className="flex flex-col gap-3">
             <div className="flex flex-col">
               {NAV_STRUCTURE.map((item) => (
                 <button
                   key={item.label}
                   onClick={() => handleNavClick(item)}
-                  className="py-3 text-sm font-medium text-left"
+                  className="py-3 text-sm font-medium text-left border-b border-[var(--line)]"
                   style={{
-                    color: item.hash ? (activeHash === item.hash ? "var(--growth-dark)" : "var(--paddy)") : (page === item.page ? "var(--growth-dark)" : "var(--paddy)"),
-                    borderBottom: "1px solid var(--line)",
-                    fontWeight: item.hash ? (activeHash === item.hash ? 700 : 500) : (page === item.page ? 700 : 500),
+                    color: isActive(item)
+                      ? "var(--growth-dark)"
+                      : "var(--paddy)",
+                    fontWeight: isActive(item) ? 700 : 500,
                   }}
                 >
                   {bis(item.label)}
                 </button>
               ))}
               <button
-                onClick={() => { setActiveHash(null); navigate(CHAT_PAGE); closeMobile(); }}
-                className="py-3 text-sm font-medium text-left flex items-center gap-2"
-                style={{ color: page === CHAT_PAGE ? "var(--growth-dark)" : "var(--paddy)", borderBottom: "1px solid var(--line)", fontWeight: 600 }}
+                onClick={goToChat}
+                className="py-3 text-sm font-medium text-left flex items-center gap-2 border-b border-[var(--line)]"
+                style={{
+                  color: isAskAIActive ? "var(--growth-dark)" : "var(--paddy)",
+                  fontWeight: isAskAIActive ? 700 : 500,
+                }}
               >
                 <Bot size={16} /> {bis("Ask AI")}
               </button>
-              <button
-                onClick={() => { setActiveHash(null); navigate(CHAT_PAGE); closeMobile(); }}
-                className="py-3 text-sm font-medium text-left flex items-center gap-2"
-                style={{ color: "var(--paddy)", borderBottom: "1px solid var(--line)" }}
+              <a
+                href={APK_URL}
+                onClick={closeMobile}
+                className="py-3 text-sm font-medium text-left flex items-center gap-2 border-b border-[var(--line)] no-underline"
+                style={{ color: "var(--paddy)" }}
               >
                 <Download size={16} /> {bis("Download App")}
-              </button>
+              </a>
             </div>
-            <div className="lang-toggle flex sm:hidden justify-between" role="group" aria-label="Language">
-              <button className={lang === "bis" ? "active" : ""} onClick={() => setLang("bis")}>Cebuano</button>
-              <button className={lang === "en" ? "active" : ""} onClick={() => setLang("en")}>English</button>
+            <div
+              className="lang-toggle flex justify-between"
+              role="group"
+              aria-label="Language"
+            >
+              <button
+                className={lang === "bis" ? "active" : ""}
+                onClick={() => setLang("bis")}
+              >
+                Cebuano
+              </button>
+              <button
+                className={lang === "en" ? "active" : ""}
+                onClick={() => setLang("en")}
+              >
+                English
+              </button>
             </div>
           </div>
         </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
-import { PASSWORD_MAX_LENGTH } from '../lib/password.js';
+import PasswordInput from '../components/PasswordInput.jsx';
 
 // Admin sign-in is by mobile number; email was retired as a portal login. Keep
 // only digits, so a pasted "09-1234-5678" still works before the API looks it up.
@@ -76,7 +76,13 @@ export default function Login() {
         </div>
         <div className="field">
           <span>Password</span>
-          <input type="password" maxLength={PASSWORD_MAX_LENGTH} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
+          <PasswordInput
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+            autoComplete="current-password"
+            required
+          />
         </div>
 
         {error && <p className="muted" style={{ color: 'var(--danger)', margin: '8px 0' }}>{error}</p>}

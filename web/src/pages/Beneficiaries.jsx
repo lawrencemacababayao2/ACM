@@ -1188,8 +1188,8 @@ const setStatusOf = async (beneficiary, nextStatus) => {
               <DetailItem label="Mobile No.">{displayValue(mobileOf(selectedBeneficiary))}</DetailItem>
             </DetailSection>
 
-            <DetailSection icon="image" title="Valid ID">
-              <DetailItem label="Submitted ID" wide>
+            <DetailSection icon="image" title="RSBSA ID">
+              <DetailItem label="Submitted RSBSA ID" wide>
                 {selectedBeneficiary.id_document ? (
                   <a
                     className="id-doc-link"
@@ -1200,7 +1200,7 @@ const setStatusOf = async (beneficiary, nextStatus) => {
                     <img
                       className="id-doc-thumb"
                       src={mediaUrl(selectedBeneficiary.id_document)}
-                      alt="Valid ID"
+                      alt="RSBSA ID"
                     />
                     <span>View full size</span>
                   </a>
