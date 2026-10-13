@@ -1,5 +1,6 @@
 import { pool } from '../config/db.js';
 import { normalizeTargetTypes, concreteTargets } from '../lib/targetTypes.js';
+import { sendPushToBeneficiary } from './push.js';
 
 // Must stay in sync with the notifications.notification_type ENUM in schema.sql.
 const NOTIFICATION_TYPES = new Set(['announcement', 'program', 'training', 'request_status']);
@@ -39,6 +40,24 @@ async function sendOne({ phone, beneficiaryId, subject = '', subjectBis, message
     [beneficiaryId || null, cleaned || null, subject, subjectBis || null, message, messageBis || null, live ? 'sent' : 'log', notifType, announcementId, requestId]
   );
   const id = result.insertId;
+
+  // Request-status updates also fire a device push (respecting the user's
+  // push_notifications preference) so a decision reaches the beneficiary even
+  // when the app is closed. Broadcasts push separately in their own routes, so
+  // this is limited to request_status to avoid double-sending.
+  if (notifType === 'request_status' && beneficiaryId) {
+    try {
+      await sendPushToBeneficiary(beneficiaryId, {
+        subject,
+        subjectBis,
+        message,
+        messageBis,
+        data: { screen: 'inbox', requestId: requestId || null },
+      });
+    } catch (e) {
+      console.log('[push] request status push failed:', e?.message || e);
+    }
+  }
 
   if (!live) {
     console.log(`[SMS LOG] -> ${cleaned || '(no phone)'}: ${smsBody}`);

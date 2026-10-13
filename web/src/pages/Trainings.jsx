@@ -29,6 +29,7 @@ import { trainingLifecycle, useNow } from '../lib/lifecycle.js';
 import TargetTypeBadges from '../components/TargetTypeBadges.jsx';
 import ActivityDetails from '../components/ActivityDetails.jsx';
 import { TableSkeleton, useSkeletonVisible, LoadingStatus } from '../components/Skeleton.jsx';
+import { SelectControl } from '../reportTypes.jsx';
 
 // Labels are singular here so they read correctly as removable chips ("Farmer ×").
 // The table and detail panel pluralise where the wording is a sentence.
@@ -89,8 +90,14 @@ export default function Trainings() {
   const [sortKey, setSortKey] = useState(null);
   const [sortDir, setSortDir] = useState('asc');
   const [formErrors, setFormErrors] = useState(null);
+  // Venue is a maintained list (see migration 026), so the form picks from it
+  // rather than typing a fresh spelling every time. The options are loaded once
+  // and refreshed after an add or a removal.
+  const [venueOptions, setVenueOptions] = useState([]);
+  const [venueConfirm, setVenueConfirm] = useState(null);
 
   const user = api.user();
+  const canManageVenues = user?.role === 'admin' || user?.role === 'super_admin';
   const online = useOnlineStatus();
   const now = useNow();
   const save = useFormSubmit();
@@ -111,6 +118,16 @@ export default function Trainings() {
   }, [toast]);
 
   useEffect(() => { load(); }, [load]);
+
+  // The venue list is shared with the Program form, so it is read from the API
+  // rather than kept locally. A failed read leaves the dropdown short but does not
+  // block the form: an admin can still add the value they need.
+  const loadVenues = useCallback(async () => {
+    try { setVenueOptions(await api.get('/venues')); }
+    catch { /* the form still works; a value can be added as a new entry */ }
+  }, []);
+
+  useEffect(() => { loadVenues(); }, [loadVenues]);
 
   const phasing = useMemo(
     () => all.map((r) => ({ ...r, phase: trainingLifecycle(r, now) })),
@@ -173,7 +190,56 @@ export default function Trainings() {
   // TypeMultiSelect hands back the whole array.
   const setTargets = (v) => { setForm({ ...form, target_beneficiary_types: v }); clearFieldError('target_beneficiary_types'); };
   const setSchedule = (v) => { setForm({ ...form, ...v }); clearFieldError('schedule'); };
+  const setVenue = (v) => { setForm({ ...form, venue: v }); clearFieldError('venue'); };
+
+  // Adds the venue to the shared list before the training is saved, so what the form
+  // shows is already on the list. Returns whether it worked, because the server
+  // refuses a value that is not on the list: leaving a failed add in the field would
+  // guarantee a second, more confusing rejection at save time.
+  const addVenue = async (list, value) => {
+    try {
+      await api.post('/venues', { value });
+      toast(`Added "${value}"`, 'ok');
+      await loadVenues();
+      return true;
+    } catch (err) {
+      toast(err.message, 'err');
+      return false;
+    }
+  };
+
+  // Removal asks first. The records are not changed either way -- the entry leaves
+  // the list, the trainings keep what they said -- so the warning is about picking
+  // that venue in future, not about data loss.
+  const askRemoveVenue = (list, value) => setVenueConfirm({ list, value });
+
+  const runRemoveVenue = async () => {
+    if (!venueConfirm) return;
+    const { value } = venueConfirm;
+    try {
+      await api.del(`/venues?value=${encodeURIComponent(value)}`);
+      toast(`Removed "${value}"`, 'ok');
+      await loadVenues();
+    } catch (err) {
+      toast(err.message, 'err');
+    } finally {
+      setVenueConfirm(null);
+    }
+  };
+
+  // The shape SelectControl expects. `managed` + `allowCustom` are what make it
+  // offer "+ Add new" and the ✕ on each entry; the roles match who may create a
+  // training, and the server re-checks the role on every call.
   const fieldError = (k) => formErrors?.[k];
+  const venueField = useMemo(() => ({
+    label: 'Venue',
+    options: venueOptions,
+    managed: true,
+    allowCustom: true,
+    customRoles: ['admin', 'super_admin'],
+    listName: 'venues',
+    maxLength: 80,
+  }), [venueOptions]);
 
   const scrollToError = useCallback(() => {
     if (!formRef.current) return;
@@ -501,7 +567,14 @@ export default function Trainings() {
           
 
           <Field label="Venue" required error={Boolean(fieldError('venue'))}>
-            <input value={form.venue} onChange={set('venue')} placeholder="e.g. MAO Office, Medina" required />
+            <SelectControl
+              field={venueField}
+              value={form.venue}
+              onChange={setVenue}
+              onAddOption={canManageVenues ? addVenue : undefined}
+              onRemoveOption={canManageVenues ? askRemoveVenue : undefined}
+              role={user?.role}
+            />
             {fieldError('venue') && <span className="error">{fieldError('venue')}</span>}
           </Field>
           <ScheduleRangeField
@@ -556,6 +629,17 @@ export default function Trainings() {
         danger
         onConfirm={closeConfirm?.onConfirm}
         onClose={() => setCloseConfirm(null)}
+      />
+      {/* A separate confirmation because a different thing is being changed: the
+          venue leaves the shared list, and the trainings that hold it are not
+          touched. */}
+      <ConfirmDialog
+        open={!!venueConfirm}
+        title={`Remove "${venueConfirm?.value}"?`}
+        message={`"${venueConfirm?.value}" will no longer be offered in the Venue dropdown. Trainings that already use it keep saying it.`}
+        confirmLabel="Remove"
+        onConfirm={runRemoveVenue}
+        onClose={() => setVenueConfirm(null)}
       />
     </div>
   );

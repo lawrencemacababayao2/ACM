@@ -130,7 +130,10 @@ export function renderCell(column, row, ctx = {}) {
 // server included -- ever sees it.
 const ADD_NEW = '__add_new__';
 
-function SelectControl({ field, value, onChange, onAddOption, onRemoveOption, role, id }) {
+// Exported so the Program and Training forms can offer the same maintained-list
+// control for Venue that the report form uses for Species and Treated By: a
+// dropdown of known values plus a trailing "+ Add new" that becomes a text box.
+export function SelectControl({ field, value, onChange, onAddOption, onRemoveOption, role, id }) {
   const configured = useMemo(() => (field.options || []).map((option) => (
     typeof option === 'string' ? { value: option, label: option } : option
   )), [field.options]);

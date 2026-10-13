@@ -1,5 +1,5 @@
 import { Leaf } from "lucide-react";
-import { FaFacebook, FaInstagram, FaYoutube } from "react-icons/fa";
+import { FaFacebook } from "react-icons/fa";
 import { FOOTER_LINKS } from "../data";
 import { useLang } from "../src/lang";
 
@@ -30,18 +30,16 @@ export default function Footer({ navigate }) {
           <h4 className="text-white font-semibold text-[13.5px] mb-4">{bis("Contact")}</h4>
           <div className="flex flex-col gap-2 text-[13px]">
             <span>Poblacion, Medina, Misamis Oriental</span>
-            <span>(088) 123-4567</span>
-            <span>mao@medina.gov.ph</span>
+            <span>09177196318</span>
+            <span>frederickdocdoc6@gmail.com</span>
           </div>
         </div>
         <div>
           <h4 className="text-white font-semibold text-[13.5px] mb-4">{bis("Follow the MAO")}</h4>
           <div className="flex gap-3">
-            {[FaFacebook, FaInstagram, FaYoutube].map((Icon, i) => (
-              <a key={i} href="#" className="w-9 h-9 rounded-full flex items-center justify-center" style={{ border: "1px solid rgba(255,255,255,0.3)" }}>
-                <Icon size={16} />
-              </a>
-            ))}
+            <a href="https://www.facebook.com/profile.php?id=100072492453972" target="_blank" rel="noopener noreferrer" aria-label="Facebook" className="w-9 h-9 rounded-full flex items-center justify-center" style={{ border: "1px solid rgba(255,255,255,0.3)" }}>
+              <FaFacebook size={16} />
+            </a>
           </div>
         </div>
       </div>

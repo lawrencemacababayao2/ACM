@@ -458,6 +458,21 @@ INSERT INTO training_benefits (training_id, benefit, sort_order) VALUES
 (1, 'Seed starter kit', 1),
 (2, 'IPM pocket guide', 0);
 
+-- Two more home-feed cards (migration 027): targeted to everyone so every
+-- signed-in beneficiary sees them in "Latest from the MAO", published fresh
+-- so they sort as the most recent.
+INSERT INTO programs (title, description, target_type, target_beneficiary_types, venue, schedule, status, published_at, show_on_website) VALUES
+('Distribution of Certified Seeds', 'Qualified beneficiaries may claim certified rice and vegetable seed packages at the MAO office. Bring a valid ID and your RSBSA number.', 'public', JSON_ARRAY('public'), 'MAO Office, Medina', '2026-10-22 09:00:00', 'published', CURRENT_TIMESTAMP, 1);
+
+INSERT INTO program_benefits (program_id, benefit, sort_order) VALUES
+(3, 'Certified seed package', 0);
+
+INSERT INTO trainings (title, description, target_type, target_beneficiary_types, venue, schedule, event_date, start_time, end_time, status, publish_status, published_at, show_on_website) VALUES
+('Organic Fertilizer Production Training', 'Hands-on session on making compost and organic fertilizers from farm and household waste. Free starter kit for participants.', 'all', JSON_ARRAY('all'), 'MAO Training Hall, Medina', '2026-10-21 09:00:00', '2026-10-21', '09:00:00', '16:00:00', 'upcoming', 'published', CURRENT_TIMESTAMP, 1);
+
+INSERT INTO training_benefits (training_id, benefit, sort_order) VALUES
+(3, 'Organic fertilizer starter kit', 0);
+
 INSERT INTO requests (beneficiary_id, type, subject, details, quantity, preferred_date, status, scheduled_for, admin_notes) VALUES
 (1, 'equipment', 'Hand Tractor', 'Requesting hand tractor for land preparation this season.', 1, '2026-09-01', 'approved', '2026-09-05', 'Tractor scheduled for morning shift.'),
 (1, 'service', 'Rice Seed Assistance', 'Asking for certified rice seeds for 1 hectare.', 4, '2026-08-25', 'pending', NULL, NULL);
@@ -495,7 +510,7 @@ INSERT INTO carousel_slides (title, category, image_url, sort_order, status) VAL
 ('Distribution of certified seeds and farm inputs', 'Services', 'https://images.unsplash.com/photo-1625246333195-78d9c38ad449?w=1600&q=80&auto=format&fit=crop', 5, 'active');
 
 INSERT INTO contact_info (id, heading, title, address, hours, phone, email) VALUES
-(1, 'Get in Touch', 'Contact the MAO', 'Poblacion, Medina, Misamis Oriental', 'Monday–Friday, 8:00 AM – 5:00 PM', '(088) 123-4567', 'mao@medina.gov.ph');
+(1, 'Get in Touch', 'Contact the MAO', 'Poblacion, Medina, Misamis Oriental', 'Monday–Friday, 8:00 AM – 5:00 PM', '09177196318', 'frederickdocdoc6@gmail.com');
 
 INSERT INTO about_cards (icon, title, text, points, sort_order) VALUES
 ('building', 'History', 'The Municipal Agriculture Office of Medina was established to carry out the municipality''s agricultural extension mandate under the Local Government Code, coordinating with provincial and national agencies to bring farm and fishery support directly to Medina''s barangays.', NULL, 0),

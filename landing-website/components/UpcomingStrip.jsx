@@ -17,11 +17,20 @@ export default function UpcomingStrip({ navigate }) {
 
   useEffect(() => {
     let alive = true;
-    api.programsTrainings({ when: "upcoming", limit: 3 })
-      .then((d) => { if (alive) setItems(Array.isArray(d.items) ? d.items : []); })
-      .catch(() => { if (alive) setItems([]); })
-      .finally(() => { if (alive) setReady(true); });
-    return () => { alive = false; };
+    api
+      .programsTrainings({ when: "upcoming", limit: 3 })
+      .then((d) => {
+        if (alive) setItems(Array.isArray(d.items) ? d.items : []);
+      })
+      .catch(() => {
+        if (alive) setItems([]);
+      })
+      .finally(() => {
+        if (alive) setReady(true);
+      });
+    return () => {
+      alive = false;
+    };
   }, []);
 
   if (!ready || items.length === 0) return null;
@@ -35,10 +44,16 @@ export default function UpcomingStrip({ navigate }) {
           center
         />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {items.map((it) => <ProgramCard key={`${it.type}-${it.id}`} item={it} />)}
+          {items.map((it) => (
+            <ProgramCard key={`${it.type}-${it.id}`} item={it} />
+          ))}
         </div>
         <div className="flex justify-center mt-8">
-          <button type="button" onClick={() => navigate(PROGRAMS_PAGE)} className="btn-primary flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => navigate(PROGRAMS_PAGE)}
+            className="btn-primary flex items-center gap-2"
+          >
             {bis("View all programs")} <ArrowRight size={16} />
           </button>
         </div>

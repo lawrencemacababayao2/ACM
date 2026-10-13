@@ -290,8 +290,17 @@ export function validateSubmission(type, optionId, fields) {
     if (f.kind === 'number' && !isNumber(v, f.min)) {
       errors.push({ field: f.key, message: `${f.label} must be a number of at least ${f.min ?? 1}.` });
     }
-    if (f.kind === 'select' && !f.choices.some((c) => c.value === String(v))) {
-      errors.push({ field: f.key, message: `Choose a valid ${f.label.toLowerCase()}.` });
+    if (f.kind === 'select') {
+      const isOtherPick = String(v) === '__other__' || String(v) === 'other';
+      if (!isOtherPick && !f.choices.some((c) => c.value === String(v))) {
+        errors.push({ field: f.key, message: `Choose a valid ${f.label.toLowerCase()}.` });
+      }
+      if (isOtherPick) {
+        const spec = values[`${f.key}__specify`];
+        if (!spec || String(spec).trim() === '') {
+          errors.push({ field: f.key, message: `Please specify your ${f.label.toLowerCase()}.` });
+        }
+      }
     }
   }
 
@@ -315,8 +324,13 @@ export function buildDetails(type, option, fields) {
     if (v == null || String(v).trim() === '') continue;
     let shown = String(v).trim();
     if (f.kind === 'select') {
-      const choice = f.choices.find((c) => c.value === shown);
-      if (choice) shown = choice.label;
+      if (shown === 'other' || shown === '__other__') {
+        const spec = values[`${f.key}__specify`];
+        shown = 'Other' + (spec && String(spec).trim() ? `: ${String(spec).trim()}` : '');
+      } else {
+        const choice = f.choices.find((c) => c.value === shown);
+        if (choice) shown = choice.label;
+      }
     }
     lines.push(`${f.label}: ${shown}`);
   }

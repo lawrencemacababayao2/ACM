@@ -38,7 +38,7 @@ export default function PasswordInput({
         tabIndex={-1}
         onClick={() => setRevealed((v) => !v)}
       >
-        <Icon name="eye" size={15} />
+        <Icon name={revealed ? 'eyeOff' : 'eye'} size={15} />
       </button>
     </div>
   );

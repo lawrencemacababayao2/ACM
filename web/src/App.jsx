@@ -14,7 +14,6 @@ import Trainings from './pages/Trainings.jsx';
 import Requests from './pages/Requests.jsx';
 import Reports from './pages/Reports.jsx';
 import LandingContent from './pages/LandingContent.jsx';
-import Chat from './pages/Chat.jsx';
 import UserManagement from './pages/UserManagement.jsx';
 import { firstReportRoute, reportCategoriesFor } from './reportCategories.js';
 
@@ -97,7 +96,6 @@ export default function App() {
             <Route path="/requests" element={<Requests />} />
             {reportRouteElements(api.user())}
             <Route path="/landing-content" element={<LandingContent />} />
-            <Route path="/chat" element={<Chat />} />
       <Route path="/user-management" element={<RequireSuperAdmin><UserManagement /></RequireSuperAdmin>} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

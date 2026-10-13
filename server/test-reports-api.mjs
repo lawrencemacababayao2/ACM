@@ -59,7 +59,7 @@ await cleanupConn.query(
 // reserved-name cases) as well as named ones, because those are generated and so
 // cannot be listed literally.
 await cleanupConn.query(
-  "DELETE FROM report_option_values WHERE (list_name = 'species' AND (value LIKE 'x%' OR value IN ('Muscovy Duck','buffalo','Camel','Other','Others'))) OR (list_name = 'staff' AND (value LIKE 'y%' OR value IN ('Rina the Vet','Made Up Name')))"
+  "DELETE FROM report_option_values WHERE (list_name = 'species' AND (value LIKE 'x%' OR value IN ('Muscovy Duck','buffalo','Camel','Other','Other'))) OR (list_name = 'staff' AND (value LIKE 'y%' OR value IN ('Rina the Vet','Made Up Name')))"
 );
 await cleanupConn.end();
 
@@ -179,23 +179,23 @@ const byActivitySingle = await call('/reports/animal-health?activity=Deworming',
 eq('activity filter matches both rows', byActivitySingle.json.data.length, 2);
 
 const bySpecies = await call('/reports/animal-health?species=Carabao', { token: admin });
-  eq('species filter', bySpecies.json.data.length, 2);
+eq('species filter', bySpecies.json.data.length, 2);
 
-  // A repeated activity param means "any of these", not "exactly this".
-  const byActivityAny = await call('/reports/animal-health?activity=Deworming&activity=Vitamins', { token: admin });
-  eq('repeated activity param matches both rows', byActivityAny.json.data.length, 2);
-  check('repeated activity is OR, not AND',
-    byActivityAny.json.data.every((r) => r.activity.includes('Deworming') || r.activity.includes('Vitamins')),
-    JSON.stringify(byActivityAny.json.data.map((r) => r.activity)));
-  const activityImpossible = await call('/reports/animal-health?activity=Castration&activity=Antibiotic', { token: admin });
-  eq('a pair with no matching row returns nothing', activityImpossible.json.data.length, 0);
-  const activityJunk = await call('/reports/animal-health?activity=NotARealActivity', { token: admin });
-  eq('an unknown activity matches nothing rather than everything', activityJunk.json.data.length, 0);
-  // Repeating a single-value filter must not be able to widen the result set.
-  const repeatedBarangay = await call('/reports/animal-health?barangay=North%20Poblacion&barangay=South%20Poblacion', { token: admin });
-  check('a repeated single-value filter cannot widen the set',
-    repeatedBarangay.json.data.length <= bySpecies.json.data.length,
-    `got ${repeatedBarangay.json.data.length}`);
+// A repeated activity param means "any of these", not "exactly this".
+const byActivityAny = await call('/reports/animal-health?activity=Deworming&activity=Vitamins', { token: admin });
+eq('repeated activity param matches both rows', byActivityAny.json.data.length, 2);
+check('repeated activity is OR, not AND',
+  byActivityAny.json.data.every((r) => r.activity.includes('Deworming') || r.activity.includes('Vitamins')),
+  JSON.stringify(byActivityAny.json.data.map((r) => r.activity)));
+const activityImpossible = await call('/reports/animal-health?activity=Castration&activity=Antibiotic', { token: admin });
+eq('a pair with no matching row returns nothing', activityImpossible.json.data.length, 0);
+const activityJunk = await call('/reports/animal-health?activity=NotARealActivity', { token: admin });
+eq('an unknown activity matches nothing rather than everything', activityJunk.json.data.length, 0);
+// Repeating a single-value filter must not be able to widen the result set.
+const repeatedBarangay = await call('/reports/animal-health?barangay=North%20Poblacion&barangay=South%20Poblacion', { token: admin });
+check('a repeated single-value filter cannot widen the set',
+  repeatedBarangay.json.data.length <= bySpecies.json.data.length,
+  `got ${repeatedBarangay.json.data.length}`);
 
 const noMatch = await call('/reports/animal-health?species=Chicken', { token: admin });
 eq('non-matching filter returns nothing', noMatch.json.data.length, 0);

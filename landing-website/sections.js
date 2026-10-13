@@ -29,8 +29,8 @@ const CONTACT_FALLBACK = {
   title: "Contact the MAO",
   address: "Poblacion, Medina, Misamis Oriental",
   hours: "Monday–Friday, 8:00 AM – 5:00 PM",
-  phone: "(088) 123-4567",
-  email: "mao@medina.gov.ph",
+  phone: "09177196318",
+  email: "frederickdocdoc6@gmail.com",
 };
 
 function useSections() {

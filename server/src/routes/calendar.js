@@ -38,7 +38,10 @@ function toDateTime(dateValue, timeValue) {
 // Optional ?from=YYYY-MM-DD&to=YYYY-MM-DD to bound the range (defaults to today
 // onward, so the Kalendaryo list shows what is still coming up).
 router.get('/', optionalAuth, wrap(async (req, res) => {
-  const today = new Date().toISOString().slice(0, 10);
+  // Local (PHT) date, not UTC: toISOString() would report yesterday for the
+  // first 8 hours of a Philippine morning and hide today's events.
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const from = String(req.query.from || today).slice(0, 10);
   const to = String(req.query.to || '9999-12-31').slice(0, 10);
 

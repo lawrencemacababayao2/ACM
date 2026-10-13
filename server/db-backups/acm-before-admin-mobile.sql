@@ -257,7 +257,7 @@ CREATE TABLE `contact_info` (
 
 LOCK TABLES `contact_info` WRITE;
 /*!40000 ALTER TABLE `contact_info` DISABLE KEYS */;
-INSERT INTO `contact_info` VALUES (1,'Get in Touch','Contact the MAO','Poblacion, Medina, Misamis Oriental','MondayΓÇôFriday, 8:00 AM ΓÇô 5:00 PM','(088) 123-4567','mao@medina.gov.ph','2026-10-04 19:16:10');
+INSERT INTO `contact_info` VALUES (1,'Get in Touch','Contact the MAO','Poblacion, Medina, Misamis Oriental','MondayΓÇôFriday, 8:00 AM ΓÇô 5:00 PM','09177196318','frederickdocdoc6@gmail.com','2026-10-04 19:16:10');
 /*!40000 ALTER TABLE `contact_info` ENABLE KEYS */;
 UNLOCK TABLES;
 

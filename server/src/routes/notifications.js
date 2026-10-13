@@ -30,18 +30,22 @@ router.get('/mine', auth, wrap(async (req, res) => {
   );
   if (!ben[0]) throw new HttpError(404, 'Beneficiary profile not found');
   const { type } = req.query;
-  const where = ['beneficiary_id = ?'];
+  const where = ['n.beneficiary_id = ?'];
   const params = [ben[0].id];
   if (type) {
-    where.push('notification_type = ?');
+    where.push('n.notification_type = ?');
     params.push(type);
   }
+  // option_key comes from the request this update points at, so the Inbox can
+  // show that request's own photo on request_status rows.
   const [rows] = await pool.query(
-    `SELECT id, type, subject, subject_bis, message, message_bis, status,
-            notification_type, announcement_id, request_id, sent_at
-     FROM notifications
+    `SELECT n.id, n.type, n.subject, n.subject_bis, n.message, n.message_bis, n.status,
+            n.notification_type, n.announcement_id, n.request_id, n.sent_at,
+            r.option_key
+     FROM notifications n
+     LEFT JOIN requests r ON r.id = n.request_id
      WHERE ${where.join(' AND ')}
-     ORDER BY sent_at DESC, id DESC LIMIT 100`,
+     ORDER BY n.sent_at DESC, n.id DESC LIMIT 100`,
     params
   );
   res.json(rows);

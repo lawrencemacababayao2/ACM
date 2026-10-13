@@ -33,7 +33,6 @@ const LINKS = [
   { to: '/trainings', label: 'Training & Seminars', icon: 'grad' },
   { to: '/requests', label: 'Requests', icon: 'list' },
   { to: '/landing-content', label: 'Landing Content', icon: 'content' },
-  { to: '/chat', label: 'Test Chatbot', icon: 'bot' },
   // User Management is a Super Admin screen only, so the link is filtered out of
   // the nav for an ADMIN rather than shown and left to fail. The API enforces the
   // same rule, and so does the route guard in App.jsx.
