@@ -247,7 +247,9 @@ async function buildSystemContext(scope, message, replyLang) {
   '  politely in one or two sentences and never guess an answer.\n\n' +
 
   'LANGUAGE:\n' +
-  `- Reply in ${replyLang}, the same language the person wrote in, and do not translate unless they ask for a translation.\n\n` +
+  `- Default to ${replyLang}, the language the person wrote in.\n` +
+  '- If the person asks you to translate, or to write in a particular language, do that instead:\n' +
+  '  give the whole reply in the language they asked for, even when it differs from the one they used.\n\n' +
 
   'RESPONSE STYLE:\n' +
   '- Keep responses clear, readable, and well-spaced.\n' +
