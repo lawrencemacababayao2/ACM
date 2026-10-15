@@ -5,7 +5,7 @@ import { CHAT_PAGE } from "./ChatWidget";
 import { useLang } from "../src/lang";
 
 const APK_URL =
-  "https://github.com/lawrencemacababayao2/ACM/releases/download/v1.0.0/AgriConnectMedina.apk";
+  "https://github.com/lawrencemacababayao2/downloadapp/releases/download/v1.0.0/AgriConnectMedina.apk";
 
 export default function Navbar({ page, navigate }) {
   const { lang, setLang, bis } = useLang();
