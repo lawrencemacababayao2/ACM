@@ -2,6 +2,7 @@ import React from 'react';
 import Field from './Field.jsx';
 import DatePicker from './DatePicker.jsx';
 import TimeRangePicker from './TimeRangePicker.jsx';
+import { toISO } from '../lib/dateUtils.js';
 
 // The Programs and Training & Seminars forms both edit a schedule as a date
 // range plus a time range. The parts live in `value` as date_from, date_to,
@@ -13,6 +14,7 @@ import TimeRangePicker from './TimeRangePicker.jsx';
 // range cannot be entered; the time range picker keeps its two ends in order.
 export default function ScheduleRangeField({ value, onChange, error }) {
   const set = (patch) => onChange({ ...value, ...patch });
+  const today = toISO(new Date());
 
   return (
     <div>
@@ -22,6 +24,7 @@ export default function ScheduleRangeField({ value, onChange, error }) {
           <DatePicker
             value={value.date_from || ''}
             onChange={(v) => set({ date_from: v })}
+            min={today}
             placeholder="Pick a date"
             ariaLabel="Start date"
           />
@@ -30,7 +33,7 @@ export default function ScheduleRangeField({ value, onChange, error }) {
           <DatePicker
             value={value.date_to || ''}
             onChange={(v) => set({ date_to: v })}
-            min={value.date_from || undefined}
+            min={value.date_from || today}
             placeholder="Pick a date"
             ariaLabel="End date"
           />
