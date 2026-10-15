@@ -16,13 +16,15 @@ import rateLimits from '../config/rateLimits.js';
 
 // Who the caller is decides which posts the assistant may draw on:
 //
-//   { kind: 'admin' }              staff -- no restriction
-//   { kind: 'beneficiary', type }  a signed-in app user -- their own type, plus
-//                                  'all' and 'public', the same rule the home feed
-//                                  applies
-//   { kind: 'public' }             the anonymous landing website -- general-public
-//                                  posts ONLY, never anything aimed at registered
-//                                  beneficiaries
+//   { kind: 'admin', userId }              Super Admin -- no restriction
+//   { kind: 'beneficiary', type, userId }  a signed-in app user -- their own type, plus
+//                                          'all' and 'public', the same rule the home feed
+//                                          applies
+//   { kind: 'public', userId? }            the anonymous landing website -- general-public
+//                                          posts ONLY, never anything aimed at registered
+//                                          beneficiaries
+//
+// userId (when present) is only ever used to load that same caller's own requests.
 //
 // Returns a SQL fragment (empty for staff) and its bind params, so it can be
 // appended to each table's WHERE. The audience column exists on programs,
@@ -35,17 +37,18 @@ function audienceClause(scope) {
   return { sql: ` AND ${publicMatchSql()}`, params: [] };
 }
 
-async function loadPublishedPrograms(scope) {
+async function loadPublishedPrograms(scope, includePast = false) {
   const { sql, params } = audienceClause(scope);
   const [programs] = await pool.query(
     `SELECT id, title, description, target_type, target_beneficiary_types, venue, schedule, end_at, cancelled
-     FROM programs WHERE status = 'published' AND cancelled = 0${sql} ORDER BY title`,
+     FROM programs WHERE status = 'published' AND cancelled = 0${sql}
+     ORDER BY ${includePast ? 'schedule DESC LIMIT 12' : 'title'}`,
     params
   );
-  // Only still-relevant activities are listed: upcoming or ongoing.
   const current = programs.filter((p) => {
     const phase = programLifecycle(p);
-    return phase === 'upcoming' || phase === 'ongoing';
+    if (phase === 'cancelled') return false;
+    return includePast || phase === 'upcoming' || phase === 'ongoing';
   });
   if (!current.length) return [];
   const ids = current.map((p) => p.id);
@@ -63,18 +66,78 @@ async function loadPublishedPrograms(scope) {
 
 // Same relevance rule as programs: only published, non-cancelled sessions that
 // have not finished are surfaced to the assistant.
-async function loadActiveTrainings(scope) {
+async function loadActiveTrainings(scope, includePast = false) {
   const { sql, params } = audienceClause(scope);
   const [rows] = await pool.query(
     `SELECT title, description, venue, event_date, start_time, end_time, status
      FROM trainings WHERE status <> 'cancelled' AND publish_status = 'published'${sql}
-     ORDER BY event_date`,
+     ORDER BY ${includePast ? 'event_date DESC LIMIT 12' : 'event_date'}`,
     params
   );
   return rows.filter((t) => {
     const phase = trainingLifecycle(t);
-    return phase === 'upcoming' || phase === 'ongoing';
+    if (phase === 'cancelled') return false;
+    return includePast || phase === 'upcoming' || phase === 'ongoing';
   });
+}
+
+function wantsPastEvents(text) {
+  return /\b(last|past|previous|earlier|ago|miaging|nakaraan)\b/i.test(String(text || ''));
+}
+
+export async function maoContactText() {
+  try {
+    const [rows] = await pool.query(
+      'SELECT heading, title, address, hours, phone, email FROM contact_info WHERE id = 1'
+    );
+    const c = rows[0];
+    const parts = [];
+    if (c) {
+      const name = c.title || c.heading;
+      if (name) parts.push(String(name));
+      if (c.address) parts.push(String(c.address));
+      const facts = [];
+      if (c.hours) facts.push(`office hours ${c.hours}`);
+      if (c.phone) facts.push(`phone ${c.phone}`);
+      if (c.email) facts.push(`email ${c.email}`);
+      if (facts.length) parts.push(facts.join(', '));
+    }
+    return parts.length ? parts.join(', ') : 'the Municipal Agriculture Office of Medina';
+  } catch {
+    return 'the Municipal Agriculture Office of Medina';
+  }
+}
+
+async function loadOwnRequests(userId) {
+  if (!userId) return [];
+  const [ben] = await pool.query(
+    'SELECT id FROM beneficiaries WHERE user_id = ? LIMIT 1',
+    [userId]
+  );
+  if (!ben[0]) return [];
+  const [rows] = await pool.query(
+    `SELECT id, type, subject, details, quantity, preferred_date, status, scheduled_for,
+            admin_notes, created_at, updated_at
+     FROM requests WHERE beneficiary_id = ? ORDER BY created_at DESC, id DESC LIMIT 10`,
+    [ben.id]
+  );
+  return rows;
+}
+
+function formatOwnRequests(rows) {
+  return rows
+    .map((r) => {
+      const bits = [`- Request #${r.id}: ${r.subject || r.type} — status ${String(r.status).replace(/_/g, ' ')}`];
+      bits.push(`  **Filed:** ${String(r.created_at).slice(0, 10)}`);
+      if (r.scheduled_for) bits.push(`  **Scheduled for:** ${String(r.scheduled_for).slice(0, 10)}`);
+      if (r.preferred_date) bits.push(`  **Preferred date:** ${String(r.preferred_date).slice(0, 10)}`);
+      if (r.quantity) bits.push(`  **Quantity:** ${r.quantity}`);
+      if (r.details) bits.push(`  **Details:** ${String(r.details).slice(0, 220)}`);
+      if (r.admin_notes) bits.push(`  **MAO note:** ${String(r.admin_notes).slice(0, 220)}`);
+      bits.push(`  **Last update:** ${String(r.updated_at || r.created_at).slice(0, 16)}`);
+      return bits.join('\n');
+    })
+    .join('\n');
 }
 
 function formatProgramLine(p) {
@@ -103,9 +166,13 @@ function formatProgramDetail(p, n) {
 // registered beneficiary can ask the MAO for. It is general information about
 // what the office offers rather than audience-targeted content, so every scope
 // may draw on it -- it is exactly what the app's request form is built from.
-function serviceCatalogText() {
+function serviceCatalogText(scope) {
+  const cfgs =
+    scope && scope.kind === 'beneficiary' && scope.type
+      ? [REQUEST_CONFIG[scope.type]].filter(Boolean)
+      : Object.values(REQUEST_CONFIG);
   const lines = [];
-  for (const cfg of Object.values(REQUEST_CONFIG)) {
+  for (const cfg of cfgs) {
     if (!cfg || !Array.isArray(cfg.options) || !cfg.options.length) continue;
     const items = cfg.options.map((o) => o.label).join(', ');
     lines.push(`- ${cfg.heading}: ${items}`);
@@ -113,19 +180,47 @@ function serviceCatalogText() {
   return lines.join('\n');
 }
 
-async function buildSystemContext(scope) {
-  const [faqs] = await pool.query('SELECT question, answer FROM faqs');
-  const programs = await loadPublishedPrograms(scope);
-  const trainings = await loadActiveTrainings(scope);
-  const catalog = serviceCatalogText();
+async function buildSystemContext(scope, message, replyLang) {
+  const pastIntent = wantsPastEvents(message);
+  const [faqs] = await pool.query('SELECT question, answer, keywords FROM faqs');
+  const programs = await loadPublishedPrograms(scope, pastIntent);
+  const trainings = await loadActiveTrainings(scope, pastIntent);
+  const catalog = serviceCatalogText(scope);
+  const contact = await maoContactText();
+  const ownRequests = scope && scope.userId ? await loadOwnRequests(scope.userId) : [];
+  let topFaqs = faqs;
+  if (faqs.length > 15) {
+    const ranked = rankFaqs(message, faqs).slice(0, 8);
+    topFaqs = ranked.length ? ranked : faqs.slice(0, 8);
+  }
+  const today = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Manila',
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(new Date());
 
   let s =
   'You are "ACM Assistant", the official AI assistant of the Municipal Agriculture Office (MAO) of ' +
   'Medina, Misamis Oriental for the AgriConnect Medina system.\n\n' +
 
+  'CONTEXT:\n' +
+  `- Today is ${today} (Asia/Manila).\n` +
+  (scope && scope.kind === 'beneficiary' && scope.type
+    ? `- The person asking is a registered ${String(scope.type).replace(/_/g, ' ')} beneficiary, so only offer requests, programs and trainings that apply to them.\n`
+    : '') +
+  (pastIntent
+    ? '- The person is asking about the past, so finished activities are listed too, most recent first.\n'
+    : '') +
+  '- Use today\u2019s date to decide what is upcoming, ongoing, this week or tomorrow. Never guess dates.\n\n' +
+
   'KNOWLEDGE RULES:\n' +
   '- Answer ONLY using the official information provided below.\n' +
-  '- The ACTIVE PROGRAMS, UPCOMING TRAININGS and REQUEST CATALOG sections are the\n' +
+  '- The PROGRAMS, TRAININGS and REQUEST CATALOG sections are the\n' +
   '  COMPLETE and AUTHORITATIVE lists. Never name a program, training, service, benefit,\n' +
   '  requirement, schedule or date that is not explicitly written in them.\n' +
   '- If a section is missing or empty, say plainly that nothing is available for that\n' +
@@ -136,22 +231,28 @@ async function buildSystemContext(scope) {
   '- NEVER reveal the personal data of any beneficiary, farmer, staff member or user (names,\n' +
   '  phone numbers, addresses, RSBSA numbers) and never describe how the system\'s database,\n' +
   '  internal routes, SMS/notification internals or staff-only tools work. Decline politely\n' +
-  '  and tell the user to contact the MAO office.\n\n' +
+  '  and tell the user to contact the MAO office.\n' +
+  '- Profile details are the person\'s own: if they ask for their own name, contact number,\n' +
+  '  address or RSBSA/FishR number, tell them to open the Profile tab of the AgriConnect\n' +
+  '  Medina app. Their own requests (status, list and details) may only be reported from the\n' +
+  '  YOUR REQUESTS section below, and only when that section is present.\n' +
+  '- If someone asks to request an item that belongs to another beneficiary type, say plainly\n' +
+  '  that they must be registered as that kind of beneficiary to request it and give the MAO\n' +
+  '  contact below. Never present another type\'s items as available to them.\n' +
+  '- If something is not offered to them, give the reason in one short sentence: programs,\n' +
+  '  posts and services are released to specific beneficiary groups, and theirs is the one\n' +
+  '  named for them above. Never list or describe what is hidden from them.\n' +
+  '- For questions outside the MAO of Medina, AgriConnect Medina and local agriculture\n' +
+  '  (weather, market prices, other offices or municipalities, national programs), decline\n' +
+  '  politely in one or two sentences and never guess an answer.\n\n' +
 
-  'LANGUAGE DETECTION:\n' +
-  '- First identify the language used by the user.\n' +
-  '- If the user writes in English, reply in English.\n' +
-  '- If the user writes in Tagalog/Filipino, reply in Tagalog/Filipino.\n' +
-  '- If the user writes in Bisaya/Cebuano, reply in Bisaya/Cebuano.\n' +
-  '- If the user mixes English and Bisaya, reply naturally in Bisaya with common English words when appropriate.\n' +
-  '- If the user mixes English and Tagalog, reply naturally in Tagalog with common English words when appropriate.\n' +
-  '- Do not translate the user message unless they specifically ask for a translation.\n' +
-  '- Do not change languages unnecessarily.\n' +
-  '- Always answer in the same primary language as the users latest message.\n\n' +
+  'LANGUAGE:\n' +
+  `- Reply in ${replyLang}, the same language the person wrote in, and do not translate unless they ask for a translation.\n\n` +
 
   'RESPONSE STYLE:\n' +
-  '- Write like a helpful ChatGPT-style assistant.\n' +
   '- Keep responses clear, readable, and well-spaced.\n' +
+  '- If the question is unclear or is missing details needed to answer it, ask one short clarifying question instead of guessing.\n' +
+  '- Answer exactly what was asked. Do not add unrelated details and do not change the subject.\n' +
   '- NEVER put a long list of information into one paragraph.\n' +
   '- Put each item on its own section.\n' +
   '- Leave a blank line between sections.\n' +
@@ -209,18 +310,45 @@ async function buildSystemContext(scope) {
     'FAQ. Do not invent items.\n\n';
   }
 
-  if (faqs.length) {
+  s +=
+  'MAO CONTACT (use these details every time you tell someone to contact the office):\n' +
+  `${contact}\n\n`;
+
+  if (ownRequests.length) {
+    s +=
+    'YOUR REQUESTS (below are ONLY the requests of the person asking, most recent first):\n' +
+    '- You may report their status, list every one of them, and give their full details, and\n' +
+    '  explain what each status means: pending = waiting for MAO review, approved = approved\n' +
+    '  but not yet scheduled, scheduled = a date has been set, in_progress = being worked on,\n' +
+    '  completed = finished, rejected = declined (see the MAO note).\n' +
+    '- Never invent a request, a status, a date or a note that is not written below, and never\n' +
+    '  show a request that is not listed here.\n' +
+    '- Only talk about them when the person asks about their own requests; never bring them up\n' +
+    '  on your own.\n\n' +
+    '=== YOUR REQUESTS ===\n' + formatOwnRequests(ownRequests) + '\n\n';
+  }
+
+  s +=
+  'USING THE APP (only when someone asks how to do something in the app; translate these\n' +
+  'steps into their language and keep them short):\n' +
+  '1. Sign in with your mobile number and password.\n' +
+  '2. Send a request: tap the + button, choose the item, fill in the form, submit.\n' +
+  '3. Check your requests and their status: open the Requests tab.\n' +
+  '4. See or update your personal details: open the Profile tab.\n' +
+  'Do not add steps that are not listed here.\n\n';
+
+  if (topFaqs.length) {
     s += '=== OFFICIAL FAQS ===\n' +
-      faqs.map(f => `Q: ${f.question}\nA: ${f.answer}`).join('\n\n') + '\n\n';
+      topFaqs.map(f => `Q: ${f.question}\nA: ${f.answer}`).join('\n\n') + '\n\n';
   }
   if (programs.length) {
-    s += '=== ACTIVE PROGRAMS ===\n' +
+    s += (pastIntent ? '=== PROGRAMS (most recent first) ===\n' : '=== ACTIVE PROGRAMS ===\n') +
       programs
         .map(formatProgramLine)
         .join('\n') + '\n\n';
   }
   if (trainings.length) {
-    s += '=== UPCOMING TRAININGS / SEMINARS ===\n' +
+    s += (pastIntent ? '=== TRAININGS / SEMINARS (most recent first) ===\n' : '=== UPCOMING TRAININGS / SEMINARS ===\n') +
       trainings
         .map(t => {
           const time = formatTimeRange(t.start_time, t.end_time);
@@ -237,31 +365,130 @@ async function buildSystemContext(scope) {
   return s;
 }
 
-function faqFallback(message, scope) {
+const STOPWORDS = new Set([
+  'the', 'and', 'for', 'are', 'you', 'your', 'that', 'this', 'with', 'what', 'when', 'where', 'how',
+  'why', 'who', 'can', 'could', 'would', 'should', 'will', 'shall', 'about', 'from', 'have', 'has',
+  'had', 'do', 'does', 'did', 'not', 'but', 'any', 'all', 'our', 'their', 'there', 'here', 'been',
+  'was', 'were', 'they', 'them', 'his', 'her', 'she', 'its', 'we', 'us', 'me', 'my', 'these',
+  'those', 'than', 'then', 'also', 'just', 'please', 'thanks', 'thank', 'hello', 'yes', 'so', 'if',
+  'as', 'at', 'in', 'on', 'to', 'of', 'is', 'it', 'be', 'by', 'or', 'an', 'a',
+  'ang', 'mga', 'ng', 'sa', 'na', 'para', 'ano', 'paano', 'kailan', 'saan', 'bakit', 'sino', 'ito',
+  'iyan', 'dito', 'doon', 'may', 'wala', 'hindi', 'oo', 'pwede', 'maaari', 'ko', 'mo', 'niya',
+  'namin', 'natin', 'kami', 'tayo', 'sila', 'ikaw', 'ka', 'kung', 'kapag', 'dahil', 'kasi', 'pero',
+  'bilang', 'tungkol', 'mula', 'hanggang', 'dapat', 'kailangan', 'rin', 'raw', 'daw', 'yung', 'nito',
+  'unsa', 'niini', 'niana', 'kini', 'kana', 'kanang', 'nga', 'kay', 'pud', 'sad', 'gani', 'gyud',
+  'diin', 'ngano', 'nganong', 'kanus', 'pila', 'dili', 'naa', 'adunay', 'karon', 'karong', 'gusto',
+  'ganahan', 'kinahanglan', 'mahitungod', 'bahin', 'tungod', 'aron', 'diri', 'didto', 'nako', 'ako',
+  'kamo', 'kita', 'ra', 'lang', 'man',
+]);
+
+function meaningfulTokens(text) {
+  const out = [];
+  const seen = new Set();
+  for (const t of String(text).toLowerCase().split(/[^a-z0-9]+/)) {
+    if (t.length < 3 || STOPWORDS.has(t) || seen.has(t)) continue;
+    seen.add(t);
+    out.push(t);
+  }
+  return out;
+}
+
+function rankFaqs(message, faqs) {
+  const tokens = meaningfulTokens(message);
+  if (!tokens.length) return [];
+  return faqs
+    .map((f, index) => {
+      const question = String(f.question || '').toLowerCase();
+      const keywords = String(f.keywords || '').toLowerCase();
+      let score = 0;
+      for (const t of tokens) {
+        if (question.includes(t)) score += 2;
+        else if (keywords.includes(t)) score += 1;
+      }
+      return { f, score, index };
+    })
+    .filter((r) => r.score > 0)
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .map((r) => r.f);
+}
+
+const CUT_NOTES = {
+  en: 'The answer was cut short because it was too long \u2014 ask me to continue for the rest.',
+  tl: 'Putol ang sagot dahil masyado itong mahaba \u2014 itanong mo sa akin kung ano pa ang susunod.',
+  bis: 'Putol ang tubag kay dugayo kaayo \u2014 pangutan-a ko kon unsa pa ang nahabilin.',
+};
+
+function cutNote(replyLang) {
+  if (replyLang === 'Bisaya (Cebuano)') return CUT_NOTES.bis;
+  if (replyLang === 'Tagalog (Filipino)') return CUT_NOTES.tl;
+  return CUT_NOTES.en;
+}
+
+function truncateAnswer(text, max, replyLang) {
+  const out = String(text || '').trim();
+  if (out.length <= max) return out;
+  const part = out.slice(0, max);
+  const sentence = Math.max(
+    part.lastIndexOf('.'),
+    part.lastIndexOf('!'),
+    part.lastIndexOf('?'),
+    part.lastIndexOf('\n'),
+  );
+  const cut = sentence >= Math.floor(max / 2) ? sentence + 1 : part.lastIndexOf(' ');
+  const head = (cut > 0 ? part.slice(0, cut) : part).trimEnd();
+  return `${head}\u2026\n\n${cutNote(replyLang)}`;
+}
+
+function faqFallback(message, scope, lang) {
   return new Promise((resolve) => {
-    const tokens = String(message).toLowerCase().split(/[^a-z0-9]+/).filter(t => t.length > 2);
+    const tokens = meaningfulTokens(message);
+    const replyLang = replyLanguage(message, lang);
+    let cachedContact = null;
+    const contactLine = async () => {
+      if (cachedContact == null) cachedContact = await maoContactText();
+      return cachedContact;
+    };
+    const done = (answer, source) => {
+      const text = truncateAnswer(answer, rateLimits.llm.maxOutputChars, replyLang);
+      console.log(`[chatbot] source=${source} chars=${text.length}`);
+      resolve({ answer: text, source });
+    };
     const run = async () => {
       try {
         const lower = String(message).toLowerCase();
+        const past = wantsPastEvents(message);
+        const wantsSteps = /\b(register|registration|registering|apply|application|requirements?|how)\b/.test(lower);
+        const wantsList = /\b(list|listing|show|see|enumerate|available|all|which|what are|what do you have|do you have|have any|are there|offer|options)\b/.test(lower);
+        const wantsOwnRequests = /\b(request|requests)\b/.test(lower) &&
+          /\b(my|mine|status|track|tracking|list|show|all|recent|update|ako|akong)\b/.test(lower);
+        const asksAboutRequirements = /\b(requirements?|documents?|needed|valid.?id)\b/.test(lower);
+
+        if (wantsOwnRequests && !asksAboutRequirements && scope && scope.userId) {
+          const rows = await loadOwnRequests(scope.userId);
+          if (rows.length) return done('Here are your requests with the MAO of Medina:\n\n' + formatOwnRequests(rows), 'DB');
+          return done(
+            'You have no requests on file yet. To send one, open the AgriConnect Medina app, tap the + button, choose what you need and submit the form.',
+            'DB'
+          );
+        }
 
         // Direct DB-backed answers (work without the LLM / FAQ)
-        if (/\bprograms?\b/.test(lower) && /\b(list|available|offer|show|all|what)\b/.test(lower)) {
-          const programs = await loadPublishedPrograms(scope);
+        if (!wantsSteps && wantsList && /\bprograms?\b/.test(lower)) {
+          const programs = await loadPublishedPrograms(scope, past);
 
           if (programs.length) {
 
             const list = programs.map((p, i) => formatProgramDetail(p, i + 1)).join('\n');
 
-            return resolve({
-              answer:
-                `Here are the available programs from the MAO of Medina:\n\n${list}`,
-              source: 'DB'
-            });
+            return done(
+              `${past ? 'Programs of the MAO of Medina (most recent first)' : 'Here are the available programs from the MAO of Medina'}:\n\n${list}`,
+              'DB'
+            );
           }
         }
 
-        if (/\b(training|trainings|seminar|seminars)\b/.test(lower)) {
-          const rows = await loadActiveTrainings(scope);
+        if (!wantsSteps && /\b(training|trainings|seminar|seminars)\b/.test(lower)) {
+          const rows = await loadActiveTrainings(scope, past);
           if (rows.length) {
 const list = rows.map((t, i) => {
           const time = formatTimeRange(t.start_time, t.end_time);
@@ -269,12 +496,16 @@ const list = rows.map((t, i) => {
             (time ? ` at ${time}` : '') +
             (t.venue ? ` (${t.venue})` : '');
         }).join('\n');
-            return resolve({ answer: 'Upcoming trainings/seminars by the MAO of Medina:\n' + list, source: 'DB' });
+            return done(`${past ? 'Trainings and seminars of the MAO of Medina (most recent first)' : 'Upcoming trainings/seminars by the MAO of Medina'}:\n` + list, 'DB');
           }
-          return resolve({ answer: 'There are no upcoming trainings scheduled right now. Please check the APP or contact the MAO office.', source: 'DB' });
+          return done(
+            `There are no ${past ? '' : 'upcoming '}trainings scheduled right now. Please check the app or contact the MAO office, ${await contactLine()}.`,
+            'DB'
+          );
         }
 
-        if (/\b(announcement|announcements|news|update|updates)\b/.test(lower) && /\b(list|latest|recent|news|show)\b/.test(lower)) {
+        if (scope && scope.kind !== 'public' &&
+            /\b(announcement|announcements|news|update|updates)\b/.test(lower) && /\b(list|latest|recent|news|show)\b/.test(lower)) {
           const { sql, params } = audienceClause(scope);
           const [rows] = await pool.query(
             `SELECT title, created_at FROM announcements WHERE status = 'published'${sql} ORDER BY created_at DESC, id DESC LIMIT 5`,
@@ -282,7 +513,7 @@ const list = rows.map((t, i) => {
           );
           if (rows.length) {
             const list = rows.map((a, i) => `${i + 1}. ${a.title} (${String(a.created_at).slice(0, 10)})`).join('\n');
-            return resolve({ answer: 'Latest announcements from the MAO of Medina:\n' + list, source: 'DB' });
+            return done('Latest announcements from the MAO of Medina:\n' + list, 'DB');
           }
         }
 
@@ -291,7 +522,7 @@ const list = rows.map((t, i) => {
         let best = null;
         let bestScore = 0;
         for (const f of rows) {
-          const hay = `${f.question} ${f.keywords || ''} ${f.answer}`.toLowerCase();
+          const hay = `${f.question} ${f.keywords || ''}`.toLowerCase();
           let score = 0;
           for (const t of tokens) if (hay.includes(t)) score += 1;
           if (score > bestScore) {
@@ -299,16 +530,20 @@ const list = rows.map((t, i) => {
             best = f;
           }
         }
-        if (best && bestScore > 0) {
-          resolve({ answer: best.answer, source: 'FAQ' });
+        const coverage = tokens.length ? bestScore / tokens.length : 0;
+        if (best && (bestScore >= 2 || coverage >= 0.4)) {
+          done(best.answer, 'FAQ');
         } else {
+          console.log(`[chatbot] source=FAQ reason=no_match matched=${bestScore} tokens=${tokens.length}`);
           resolve({
-            answer: 'I am not sure about that yet. Please contact the Municipal Agriculture Office of Medina (Mon-Fri, 8AM-5PM) for assistance.',
+            answer: `I am not sure about that yet. Please contact the Municipal Agriculture Office of Medina, ${await contactLine()}, for assistance.`,
             source: 'FAQ',
           });
         }
-      } catch {
-        resolve({ answer: 'ACM Assistant is temporarily unavailable. Please visit or call the MAO office.', source: 'FAQ' });
+      } catch (err) {
+        console.warn(`[chatbot] fallback reason=${err?.name || 'Error'}`);
+        const contact = await maoContactText();
+        resolve({ answer: `ACM Assistant is temporarily unavailable. Please visit or call the MAO office, ${contact}.`, source: 'FAQ' });
       }
     };
     run();
@@ -362,22 +597,34 @@ function detectLang(text) {
   }
   bi += matchLang(tokens, BISAYA_MARKERS);
   tl += matchLang(tokens, TAGALOG_MARKERS);
-  if (bi > 0 && bi >= tl) return 'Bisaya (Cebuano)';
-  if (tl > 0 && tl >= bi) return 'Tagalog (Filipino)';
-  return 'English';
+  if (en === 0 && bi === 0 && tl === 0) return null;
+  if (en >= bi && en >= tl) return 'English';
+  if (bi >= tl) return 'Bisaya (Cebuano)';
+  return 'Tagalog (Filipino)';
 }
 
-export async function answer(message, lang, scope) {
+function replyLanguage(text, lang) {
+  const detected = detectLang(text);
+  if (detected) return detected;
+  if (lang === 'bis') return 'Bisaya (Cebuano)';
+  if (lang === 'en') return 'English';
+  return 'Tagalog (Filipino)';
+}
+
+export async function answer(message, lang, scope, history = []) {
   const apiKey = process.env.LLM_API_KEY || '';
-  const baseUrl = (process.env.LLM_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '');
-  const model = process.env.LLM_MODEL || 'gpt-4o-mini';
+  const baseUrl = (process.env.LLM_BASE_URL || 'https://openrouter.ai/api/v1').replace(/\/$/, '').trim();
+  const model = (process.env.LLM_MODEL || 'openai/gpt-4o-mini').trim();
 
-  if (!apiKey) return faqFallback(message, scope);
+  const replyLang = replyLanguage(message, lang);
 
-  const detected = lang === 'bis' ? 'Bisaya (Cebuano)' : lang === 'en' ? 'English' : detectLang(message);
+  if (!apiKey) {
+    console.warn('[chatbot] fallback reason=no_api_key');
+    return faqFallback(message, scope, lang);
+  }
 
   try {
-    const system = await buildSystemContext(scope);
+    const system = await buildSystemContext(scope, message, replyLang);
     const res = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -390,7 +637,7 @@ export async function answer(message, lang, scope) {
         model,
         messages: [
           { role: 'system', content: system },
-          { role: 'system', content: `The user's message is in ${detected}. The ENTIRE reply must be written ONLY in ${detected}. Do not use any other language.` },
+          ...(Array.isArray(history) ? history : []),
           { role: 'user', content: String(message) },
         ],
         max_tokens: rateLimits.llm.maxOutputTokens,
@@ -401,18 +648,21 @@ export async function answer(message, lang, scope) {
       // fallback instead.
       signal: AbortSignal.timeout(rateLimits.llm.timeoutMs),
     });
-    if (!res.ok) return faqFallback(message, scope);
+    if (!res.ok) {
+      console.warn(`[chatbot] fallback reason=http_${res.status}`);
+      return faqFallback(message, scope, lang);
+    }
     const data = await res.json();
     const content = data?.choices?.[0]?.message?.content;
-    if (!content) return faqFallback(message, scope);
-    const trimmed = content.trim();
-    return {
-      answer: trimmed.length > rateLimits.llm.maxOutputChars
-        ? `${trimmed.slice(0, rateLimits.llm.maxOutputChars)}…`
-        : trimmed,
-      source: 'AI',
-    };
-  } catch {
-    return faqFallback(message, scope);
+    if (!content) {
+      console.warn('[chatbot] fallback reason=empty_content');
+      return faqFallback(message, scope, lang);
+    }
+    const trimmed = truncateAnswer(content, rateLimits.llm.maxOutputChars, replyLang);
+    console.log(`[chatbot] source=AI chars=${trimmed.length}`);
+    return { answer: trimmed, source: 'AI' };
+  } catch (err) {
+    console.warn(`[chatbot] fallback reason=${err?.name || 'Error'}`);
+    return faqFallback(message, scope, lang);
   }
 }

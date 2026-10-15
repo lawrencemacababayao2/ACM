@@ -39,7 +39,7 @@ export const api = {
   carousel: () => request("/carousel"),
   sections: () => request("/landing-sections"),
   faqs: () => request("/faqs"),
-  chat: (message, lang) => request("/chatbot", { method: "POST", body: JSON.stringify({ message, lang }) }),
+  chat: (message, lang, history) => request("/chatbot", { method: "POST", body: JSON.stringify({ message, lang, history }) }),
   translate: (texts, lang) => request("/translate", { method: "POST", body: JSON.stringify({ texts, lang }) }),
   // Public-only feed: published, website-visible programs and trainings. The
   // server filters drafts/cancelled rows and strips staff-only fields, so this

@@ -131,10 +131,17 @@ export function useAssistant(lang, bis) {
     const text = (raw ?? input).trim();
     if (!text || busy || cooldown > 0) return;
     setInput("");
+    const history = messages
+      .slice(-6)
+      .map((m) => ({
+        role: m.role === "user" ? "user" : "assistant",
+        content: typeof m.text === "string" ? m.text : "",
+      }))
+      .filter((m) => m.content && !m.endsAt);
     setMessages((m) => [...m, { role: "user", text }]);
     setBusy(true);
     try {
-      const data = await api.chat(text, lang);
+      const data = await api.chat(text, lang, history);
       setMessages((m) => [...m, { role: "bot", text: data.answer || (lang === "bis" ? "Pasensya, dili ako makatubag sa imong pangutana karon." : "Sorry, I could not answer that right now.") }]);
     } catch (err) {
       if (err && err.status === 429) {

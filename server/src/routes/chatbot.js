@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { answer } from '../services/chatbot.js';
+import { answer, maoContactText } from '../services/chatbot.js';
 import { wrap, HttpError } from '../lib/utils.js';
-import { optionalAuth, ADMIN_ROLES } from '../middleware/auth.js';
+import { optionalAuth } from '../middleware/auth.js';
 import { beneficiaryTypeForUser } from '../lib/targetTypes.js';
 import { pool } from '../config/db.js';
 import { anonSession } from '../middleware/anonSession.js';
@@ -21,17 +21,20 @@ const router = Router();
 // Who is asking decides what the assistant is allowed to answer from.
 //
 // The public landing website calls this with no token at all, so an anonymous
-// request is scoped to *public* information only: programs, trainings and
-// advisories aimed at the general public, exactly what the website itself shows.
+// request is scoped to *public* information only: programs and trainings aimed
+// at the general public, exactly what the website itself shows.
 // A signed-in beneficiary (the mobile app sends its bearer token) gets their own
-// audience, and staff keep seeing everything.
+// audience, and only a Super Admin sees everything. userId rides along for every
+// signed-in caller so the assistant can report their own requests.
 async function resolveScope(req) {
   if (!req.user) return { kind: 'public' };
-  if (ADMIN_ROLES.includes(req.user.role)) return { kind: 'admin' };
+  if (req.user.role === 'super_admin') return { kind: 'admin', userId: req.user.id };
   const type = await beneficiaryTypeForUser(pool, req.user.id);
   // A user with no beneficiary profile is treated as the general public rather
   // than silently receiving every registered-group post.
-  return type ? { kind: 'beneficiary', type } : { kind: 'public' };
+  return type
+    ? { kind: 'beneficiary', type, userId: req.user.id }
+    : { kind: 'public', userId: req.user.id };
 }
 
 // Cheap filter for messages that carry no information at all (repeated keysmashes
@@ -49,21 +52,33 @@ function isLowInfoSpam(text) {
 // The whole-service daily budget has run out. The request is *not* an error --
 // the visitor just gets a polite "come back tomorrow" answer instead, which the
 // frontends render as a normal assistant bubble.
-function restingMessage(lang) {
+async function restingMessage(lang) {
+  const contact = await maoContactText();
   if (lang === 'bis') {
-    return 'Nagpahulay na ang assistant karon adlawa. Palihug kontaka ang MAO office (Medina Municipal Agriculture Office) para sa tabang, o sulayi usab ugma.';
+    return `Nagpahulay na ang assistant karon adlawa. Palihug kontaka ang MAO office, ${contact}, para sa tabang, o sulayi usab ugma.`;
   }
-  return 'The assistant has reached today\u2019s limit and is resting now. Please contact the MAO office (Medina Municipal Agriculture Office) for help, or try again tomorrow.';
+  return `The assistant has reached today\u2019s limit and is resting now. Please contact the MAO office, ${contact}, for help, or try again tomorrow.`;
 }
 
-// POST /api/chatbot  { message, lang? }
+function sanitizeHistory(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((h) => ({
+      role: h && h.role === 'assistant' ? 'assistant' : h && h.role === 'user' ? 'user' : null,
+      content: h && typeof h.content === 'string' ? h.content.trim().slice(0, 500) : '',
+    }))
+    .filter((h) => h.role && h.content)
+    .slice(-6);
+}
+
+// POST /api/chatbot  { message, lang?, history? }
 // Auth is optional on purpose: the token decides the scope, not access itself.
 // The visitor key drives three overlapping guards:
 //   1. per-minute + per-day budgets (middleware/rateLimit. chatbotLimits),
 //   2. a whole-service daily cap that stops the provider bill at one number,
 //   3. a Turnstile challenge after a burst of messages from one visitor.
 router.post('/', optionalAuth, anonSession, chatbotLimits, wrap(async (req, res) => {
-  const { message, lang } = req.body || {};
+  const { message, lang, history } = req.body || {};
   if (!message || !String(message).trim()) throw new HttpError(400, 'Message is required');
   const text = String(message).trim();
   if (text.length > rateLimits.chatbot.maxMessageChars) {
@@ -89,10 +104,13 @@ router.post('/', optionalAuth, anonSession, chatbotLimits, wrap(async (req, res)
   }
 
   const daily = consumeDailyBudget('chatbot', rateLimits.chatbot.dailyCap);
-  if (!daily.allowed) return res.json({ answer: restingMessage(lang), source: 'cap' });
+  if (!daily.allowed) {
+    console.log('[chatbot] source=cap');
+    return res.json({ answer: await restingMessage(lang), source: 'cap' });
+  }
 
   const scope = await resolveScope(req);
-  const result = await answer(message, lang, scope);
+  const result = await answer(message, lang, scope, sanitizeHistory(history));
   slidingHit(visitorKey, rateLimits.chatbot.captchaWindowMs);
   res.json({ ...result, received: message });
 }));
