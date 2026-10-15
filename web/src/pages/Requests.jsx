@@ -18,6 +18,7 @@ import RecordToolbar, { DateRangeFilter } from '../components/RecordToolbar.jsx'
 import FilterPill from '../components/FilterPill.jsx';
 import PageHeader from '../components/PageHeader.jsx';
 import useRecordFilters from '../lib/useRecordFilters.js';
+import { toISO } from '../lib/dateUtils.js';
 import { TableSkeleton, useSkeletonVisible, LoadingStatus } from '../components/Skeleton.jsx';
 
 const STATUSES = ['pending', 'approved', 'scheduled', 'in_progress', 'completed', 'rejected'];
@@ -710,6 +711,7 @@ function ItemPanel({ request, catalog, form, setForm, save, draft, online, onSub
                 onChange={(v) => setForm({ ...form, scheduled_for: v })}
                 ariaLabel="Scheduled for"
                 placeholder={form.status === 'scheduled' ? 'Pick a date' : 'Only for scheduled requests'}
+                min={toISO(new Date())}
                 disabled={form.status !== 'scheduled'}
               />
             </Field>

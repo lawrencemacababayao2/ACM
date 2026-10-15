@@ -29,6 +29,9 @@ export default function PasswordInput({
         maxLength={PASSWORD_MAX_LENGTH}
         aria-invalid={invalid || undefined}
         {...rest}
+        autoCapitalize="none"
+        autoCorrect="off"
+        spellCheck={false}
       />
       <button
         type="button"

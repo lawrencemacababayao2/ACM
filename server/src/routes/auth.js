@@ -231,7 +231,14 @@ router.post('/forgot-password/request', forgotRequestLimiter, wrap(async (req, r
     if (daily.allowed) {
       const credits = await getSmsCredits();
       if (credits === null || credits >= rateLimits.otp.minSmsCredits) {
-        await issueOtp(check.mobile, FORGOT_PURPOSE);
+        // A failed send must not change the response: a 5xx here would reveal
+        // that this number has an account. issueOtp already logs the reason, and
+        // because it only records the code on success, no cooldown is started.
+        try {
+          await issueOtp(check.mobile, FORGOT_PURPOSE);
+        } catch {
+          // Swallowed on purpose; the generic body below is the whole answer.
+        }
       }
     }
   }

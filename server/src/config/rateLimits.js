@@ -84,10 +84,10 @@ export const rateLimits = {
   },
 
   login: {
-    // Failures only (successful sign-ins do not count). 5 failures / 15 min per
+    // Failures only (successful sign-ins do not count). 10 failures / 5 min per
     // mobile number AND IP, plus a progressively longer pause per prior failure.
-    windowMs: 15 * MINUTE,
-    max: envInt('RL_LOGIN_MAX', 5),
+    windowMs: 5 * MINUTE,
+    max: envInt('RL_LOGIN_MAX', 10),
     delayStepMs: envInt('RL_LOGIN_DELAY_STEP_MS', 800),
     delayMaxMs: envInt('RL_LOGIN_DELAY_MAX_MS', 8000),
   },

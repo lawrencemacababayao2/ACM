@@ -91,6 +91,7 @@ export function makeLimiter(routeName, options = {}) {
     keyGenerator = clientIp,
     skip,
     skipSuccessfulRequests = false,
+    skipFailedRequests = false,
   } = options;
 
   return rateLimit({
@@ -99,6 +100,7 @@ export function makeLimiter(routeName, options = {}) {
     standardHeaders: true,
     legacyHeaders: true,
     skipSuccessfulRequests,
+    skipFailedRequests,
     skip,
     keyGenerator,
     // trust proxy is off for this deployment, so an X-Forwarded-For header from a
@@ -176,12 +178,16 @@ export const otpPhoneMinute = makeLimiter('otp-phone-minute', {
   // Wrapped in an arrow so the library's (req, res) call cannot be misread as the
   // field-name argument (which is how "p:" for every number once happened).
   keyGenerator: (req) => phoneKey(req),
+  // A request that never produced a code (bad input, provider outage) must not
+  // spend the per-number budget, or a failed send locks the user out of retrying.
+  skipFailedRequests: true,
   message: 'Please wait before requesting another verification code.',
 });
 
 export const otpPhoneHour = makeLimiter('otp-phone-hour', {
   ...rateLimits.otp.phoneHour,
   keyGenerator: (req) => phoneKey(req),
+  skipFailedRequests: true,
   message: 'Too many codes requested for this number. Please try again later.',
 });
 

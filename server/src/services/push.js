@@ -48,7 +48,7 @@ async function sendBatches(messages) {
 // legacy `category` are consulted, for the same reason as in services/sms.js: a
 // beneficiary registered under the newer column still carries the old ENUM's
 // 'farmer' default.
-export async function sendPush({ subject, subjectBis, message, messageBis, categories, category }) {
+export async function sendPush({ subject, subjectBis, message, messageBis, categories, category, data }) {
   const targets = concreteTargets(normalizeTargetTypes(categories ?? category));
   const params = ['verified'];
   let where = 'b.status = ?';
@@ -65,7 +65,7 @@ export async function sendPush({ subject, subjectBis, message, messageBis, categ
      WHERE ${where} AND ${PUSH_ENABLED}`,
     params
   );
-  return sendBatches(messagesFor(rows, { subject, subjectBis, message, messageBis, data: { screen: 'inbox' } }));
+  return sendBatches(messagesFor(rows, { subject, subjectBis, message, messageBis, data: data || { screen: 'inbox' } }));
 }
 
 // Pushes to a single beneficiary (used for request-status updates). Honours the

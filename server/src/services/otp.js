@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { pool } from '../config/db.js';
+import { HttpError } from '../lib/utils.js';
 import { sendOne } from './sms.js';
 
 const OTP_LENGTH = 5;
@@ -57,6 +58,27 @@ export async function issueOtp(mobile, purpose = 'register') {
   const code = randomDigits(OTP_LENGTH);
   const expiresAt = new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1000);
 
+  const pretty = '+63' + mobile.slice(1);
+  const minutes = OTP_TTL_MINUTES;
+  // Delivered over the same SMS gateway the rest of the app uses. With no
+  // credentials the service runs in LOG mode and prints the code instead.
+  const sent = await sendOne({
+    phone: pretty,
+    subject: 'AgriConnect Medina verification code',
+    subjectBis: 'AgriConnect Medina verification code',
+    message: `Your AgriConnect Medina verification code is ${code}. It expires in ${minutes} minutes. Do not share this code with anyone.`,
+    messageBis: `Ang imong AgriConnect Medina verification code mao ang ${code}. Mapamatay human sa ${minutes} minuto. Ayaw i-share ni nga code sa bisan kinsa.`,
+    notificationType: 'announcement',
+  });
+
+  // Only store the code (which is what arms the resend cooldown) once the message
+  // is genuinely on its way. If the provider rejects or the request throws, the
+  // user never received a code, so they must not be locked out of requesting one.
+  if (!sent.ok) {
+    console.error(`[otp] failed to send ${purpose} code to ${pretty}:`, sent.error || sent.body || 'unknown provider error');
+    throw new HttpError(502, 'We could not send the verification code. Please try again.');
+  }
+
   // Mark older codes as superseded instead of "verified": an old code must
   // never be able to satisfy the register-time ownership check.
   await pool.query(
@@ -67,19 +89,6 @@ export async function issueOtp(mobile, purpose = 'register') {
     'INSERT INTO otp_codes (mobile_number, code, purpose, expires_at) VALUES (?, ?, ?, ?)',
     [mobile, hashCode(code), purpose, expiresAt]
   );
-
-  const pretty = '+63' + mobile.slice(1);
-  const minutes = OTP_TTL_MINUTES;
-  // Delivered over the same SMS gateway the rest of the app uses. With no
-  // credentials the service runs in LOG mode and prints the code instead.
-  await sendOne({
-    phone: pretty,
-    subject: 'AgriConnect Medina verification code',
-    subjectBis: 'AgriConnect Medina verification code',
-    message: `Your AgriConnect Medina verification code is ${code}. It expires in ${minutes} minutes. Do not share this code with anyone.`,
-    messageBis: `Ang imong AgriConnect Medina verification code mao ang ${code}. Mapamatay human sa ${minutes} minuto. Ayaw i-share ni nga code sa bisan kinsa.`,
-    notificationType: 'announcement',
-  });
 
   return { code, expiresAt, ttlMinutes: OTP_TTL_MINUTES, cooldown: RESEND_COOLDOWN_SECONDS };
 }

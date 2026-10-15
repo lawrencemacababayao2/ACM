@@ -8,6 +8,8 @@ import { wrap, HttpError } from '../lib/utils.js';
 import {
   normalizeTargetTypes,
   readTargetTypes,
+  readNotifiedTypes,
+  newlyTargeted,
   legacyTargetType,
   toJsonColumn,
   requireTargetTypes,
@@ -59,22 +61,30 @@ async function ensurePublishedNotify(announcement) {
   // Recipients are unioned across every selected type; see typePredicate in
   // services/sms.js for why both beneficiary_type and category are matched.
   const categories = readTargetTypes(announcement);
+  // Only the target types not announced on an earlier publish get a fresh
+  // in-app notification + push, so re-targeting a live advisory reaches the
+  // newly added audience without spamming the original one.
+  const pending = newlyTargeted(categories, readNotifiedTypes(announcement));
   const wantSms = announcement.send_sms && !announcement.sms_sent;
-  if (announcement.notified && !wantSms) return { app: 0, sms: 0, pushed: 0 };
+  if (!pending.length && !wantSms) return { app: 0, sms: 0, pushed: 0 };
 
   let app = 0;
   let sms = 0;
   let pushed = 0;
-  if (!announcement.notified) {
-    app = (await notifyVerifiedApp({ subject, subjectBis: subject, message, messageBis, categories, notificationType: notifType, announcementId: announcement.id })).length;
-    pushed = await sendPush({ subject, subjectBis: subject, message, messageBis, categories });
+  if (pending.length) {
+    app = (await notifyVerifiedApp({ subject, subjectBis: subject, message, messageBis, categories: pending, notificationType: notifType, announcementId: announcement.id })).length;
+    pushed = await sendPush({
+      subject, subjectBis: subject, message, messageBis, categories: pending,
+      data: { screen: 'inbox', kind: 'advisory', id: announcement.id },
+    });
   }
   if (wantSms) {
     sms = (await broadcastToVerified({ subject, subjectBis: subject, message, messageBis, categories, notificationType: notifType, announcementId: announcement.id })).length;
   }
+  const announced = normalizeTargetTypes([...readNotifiedTypes(announcement), ...categories]);
   await pool.query(
-    'UPDATE announcements SET notified = 1, sms_sent = CASE WHEN ? THEN 1 ELSE sms_sent END WHERE id = ?',
-    [wantSms, announcement.id]
+    'UPDATE announcements SET notified = 1, notified_types = ?, sms_sent = CASE WHEN ? THEN 1 ELSE sms_sent END WHERE id = ?',
+    [toJsonColumn(announced), wantSms, announcement.id]
   );
   return { app, sms, pushed };
 }
@@ -148,7 +158,7 @@ router.post('/', auth, adminOnly, idempotent(), wrap(async (req, res) => {
   const newRow = {
     id: r.insertId, title: String(title).trim(), body,
     target_beneficiary_types: targets, target_type: legacyTargetType(targets),
-    send_sms: send_sms ? 1 : 0, status: st, sms_sent: 0, notified: 0, type: type || 'announcement',
+    send_sms: send_sms ? 1 : 0, status: st, sms_sent: 0, notified: 0, notified_types: [], type: type || 'announcement',
   };
   const { app, sms, pushed } = await ensurePublishedNotify(newRow);
   if (st === 'published' && publishedAt) {
@@ -180,7 +190,7 @@ router.put('/:id', auth, adminOnly, idempotent(), wrap(async (req, res) => {
   // Decide SMS from the persisted row so a draft saved with "send SMS" checked
   // ALWAYS sends when later published, even if the edit form drops the flag.
   const [after] = await pool.query(
-    'SELECT id, title, body, target_type, target_beneficiary_types, send_sms, sms_sent, status, notified, type FROM announcements WHERE id = ?',
+    'SELECT id, title, body, target_type, target_beneficiary_types, send_sms, sms_sent, status, notified, notified_types, type FROM announcements WHERE id = ?',
     [req.params.id]
   );
   const { app, sms, pushed } = await ensurePublishedNotify(shapeRow(after[0]));

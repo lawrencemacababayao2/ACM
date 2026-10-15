@@ -52,7 +52,7 @@ async function sendOne({ phone, beneficiaryId, subject = '', subjectBis, message
         subjectBis,
         message,
         messageBis,
-        data: { screen: 'inbox', requestId: requestId || null },
+        data: { screen: 'inbox', kind: 'request_status', id, requestId: requestId || null },
       });
     } catch (e) {
       console.log('[push] request status push failed:', e?.message || e);
@@ -77,12 +77,16 @@ async function sendOne({ phone, beneficiaryId, subject = '', subjectBis, message
     });
     const body = await res.text();
     const status = res.ok ? 'sent' : 'failed';
+    if (!res.ok) {
+      console.error(`[sms] gateway rejected message to ${cleaned || '(no phone)'}: HTTP ${res.status} ${body.slice(0, 240)}`);
+    }
     await pool.execute(
       'UPDATE notifications SET status = ?, gateway_ref = ? WHERE id = ?',
       [status, body.slice(0, 240), id]
     );
     return { ok: res.ok, mode: 'gateway', id, body };
   } catch (err) {
+    console.error(`[sms] gateway request failed for ${cleaned || '(no phone)'}:`, err?.message || err);
     await pool.execute("UPDATE notifications SET status = 'failed' WHERE id = ?", [id]);
     return { ok: false, mode: 'gateway', id, error: err.message };
   }

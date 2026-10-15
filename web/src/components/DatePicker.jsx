@@ -60,8 +60,11 @@ export default function DatePicker({
 
   // A year dropdown in the header, so a birthday - which is often decades in the
   // past - can be reached in one selection instead of dozens of month chevrons.
-  // Spans the allowed window; without a min it starts at 1900.
-  const yearEnd = maxDate ? maxDate.getFullYear() : new Date().getFullYear();
+  // Spans the allowed window; without a min it starts at 1900, and a future-only
+  // window (a min but no max) reaches a decade ahead so upcoming dates are
+  // selectable rather than stopping at the current year.
+  const thisYear = new Date().getFullYear();
+  const yearEnd = maxDate ? maxDate.getFullYear() : minDate ? thisYear + 10 : thisYear;
   const yearStart = minDate ? minDate.getFullYear() : 1900;
   const yearOptions = [];
   for (let y = yearEnd; y >= yearStart; y--) yearOptions.push(y);
@@ -70,12 +73,21 @@ export default function DatePicker({
     setView((v) => new Date(Math.max(yearStart, Math.min(yearEnd, year)), v.getMonth(), 1));
   };
 
+  // Symmetric to the ceiling below: a lower bound means months before it are
+  // unreachable, so the floor of the window does not present a wall of days that
+  // are all struck out.
+  const atFloor = Boolean(minDate) && (
+    view.getFullYear() < minDate.getFullYear()
+    || (view.getFullYear() === minDate.getFullYear() && view.getMonth() <= minDate.getMonth())
+  );
+
   const atCeiling = Boolean(maxDate) && (
     view.getFullYear() > maxDate.getFullYear()
     || (view.getFullYear() === maxDate.getFullYear() && view.getMonth() >= maxDate.getMonth())
   );
 
   const shiftMonth = (delta) => {
+    if (delta < 0 && atFloor) return;
     if (delta > 0 && atCeiling) return;
     setView((v) => new Date(v.getFullYear(), v.getMonth() + delta, 1));
   };
@@ -142,6 +154,7 @@ export default function DatePicker({
             classFor={classFor}
             onDayClick={pick}
             isDayDisabled={isDayDisabled}
+            disablePrev={atFloor}
             disableNext={atCeiling}
             yearOptions={yearOptions}
             onJumpYear={jumpYear}

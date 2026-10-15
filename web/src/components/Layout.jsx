@@ -1,42 +1,48 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { api } from '../api.js';
-import { useToast } from '../toast.jsx';
-import Icon from './Icon.jsx';
-import BrandMotif from './BrandMotif.jsx';
-import ConnectionBanner from './ConnectionBanner.jsx';
-import {
-  isReportsArea, reportCategoriesFor,
-} from '../reportCategories.js';
+import React, { useEffect, useRef, useState } from "react";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { api } from "../api.js";
+import { useToast } from "../toast.jsx";
+import Icon from "./Icon.jsx";
+import BrandMotif from "./BrandMotif.jsx";
+import ConnectionBanner from "./ConnectionBanner.jsx";
+import { isReportsArea, reportCategoriesFor } from "../reportCategories.js";
 
-const COLLAPSED_KEY = 'acm_sidebar_collapsed';
+const COLLAPSED_KEY = "acm_sidebar_collapsed";
 
 // Friendly role shown under the account name in the sidebar footer. The stored
 // value is 'super_admin' / 'admin'.
-const roleLabel = (v) => (v === 'super_admin' ? 'Head' : v === 'admin' ? 'Admin' : v);
+const roleLabel = (v) =>
+  v === "super_admin" ? "Head" : v === "admin" ? "Admin" : v;
 
 // The account advertises its name first, email second - sign-in itself is by
 // mobile, so the mailbox is not shown on every screen.
 const displayName = (user) =>
-  [user?.first_name, user?.middle_name, user?.last_name].filter(Boolean).join(' ')
-  || user?.email
-  || 'Account';
+  [user?.first_name, user?.middle_name, user?.last_name]
+    .filter(Boolean)
+    .join(" ") ||
+  user?.email ||
+  "Account";
 
 // Reports is absent from this list on purpose: it is a parent with its own
 // submenu, rendered separately below the flat links. Its children come from
 // reportCategories.js, which the router also reads.
 const LINKS = [
-  { to: '/', label: 'Dashboard', icon: 'grid', end: true },
-  { to: '/beneficiaries', label: 'Beneficiaries', icon: 'users' },
-  { to: '/announcements', label: 'Advisories', icon: 'megaphone' },
-  { to: '/programs', label: 'Programs', icon: 'leaf' },
-  { to: '/trainings', label: 'Training & Seminars', icon: 'grad' },
-  { to: '/requests', label: 'Requests', icon: 'list' },
-  { to: '/landing-content', label: 'Landing Content', icon: 'content' },
+  { to: "/", label: "Dashboard", icon: "grid", end: true },
+  { to: "/beneficiaries", label: "Beneficiaries", icon: "users" },
+  { to: "/announcements", label: "Advisories", icon: "megaphone" },
+  { to: "/programs", label: "Programs", icon: "leaf" },
+  { to: "/trainings", label: "Trainings & Seminars", icon: "grad" },
+  { to: "/requests", label: "Requests", icon: "list" },
+  { to: "/landing-content", label: "Landing Content", icon: "content" },
   // User Management is a Super Admin screen only, so the link is filtered out of
   // the nav for an ADMIN rather than shown and left to fail. The API enforces the
   // same rule, and so does the route guard in App.jsx.
-  { to: '/user-management', label: 'User Management', icon: 'user', superAdminOnly: true },
+  {
+    to: "/user-management",
+    label: "User Management",
+    icon: "user",
+    superAdminOnly: true,
+  },
 ];
 
 export default function Layout() {
@@ -46,14 +52,17 @@ export default function Layout() {
   const location = useLocation();
 
   const [collapsed, setCollapsed] = useState(() => {
-  try {
-    return localStorage.getItem(COLLAPSED_KEY) === '1';
-  } catch {
-    return false;
-  }
-});
+    try {
+      return localStorage.getItem(COLLAPSED_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
 
-const [pendingCounts, setPendingCounts] = useState({ requests: 0, beneficiaries: 0 });
+  const [pendingCounts, setPendingCounts] = useState({
+    requests: 0,
+    beneficiaries: 0,
+  });
 
   // Mobile uses a drawer rather than the desktop collapse. The header burger opens
   // and closes it, and it is dismissed by navigating, by Escape, or by tapping the
@@ -67,12 +76,14 @@ const [pendingCounts, setPendingCounts] = useState({ requests: 0, beneficiaries:
   const reportsBtnRef = useRef(null);
   const [flyoutPos, setFlyoutPos] = useState(null);
 
-  const visibleLinks = LINKS.filter((l) => !l.superAdminOnly || user?.role === 'super_admin');
+  const visibleLinks = LINKS.filter(
+    (l) => !l.superAdminOnly || user?.role === "super_admin",
+  );
   // User Management is pinned to the very bottom of the sidebar, even below the
   // Reports group, so the Split renders the flat links, then Reports, then this
   // trailing link.
-  const trailingLinks = visibleLinks.filter((l) => l.to === '/user-management');
-  const mainLinks = visibleLinks.filter((l) => l.to !== '/user-management');
+  const trailingLinks = visibleLinks.filter((l) => l.to === "/user-management");
+  const mainLinks = visibleLinks.filter((l) => l.to !== "/user-management");
 
   const reportCategories = reportCategoriesFor(user);
   // True anywhere under /reports, including /reports itself before it redirects, so
@@ -101,13 +112,13 @@ const [pendingCounts, setPendingCounts] = useState({ requests: 0, beneficiaries:
       if (!reportsRef.current?.contains(event.target)) setReportsOpen(false);
     };
     const onKeyDown = (event) => {
-      if (event.key === 'Escape') setReportsOpen(false);
+      if (event.key === "Escape") setReportsOpen(false);
     };
-    document.addEventListener('pointerdown', onPointerDown);
-    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
     return () => {
-      document.removeEventListener('pointerdown', onPointerDown);
-      document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
     };
   }, [collapsed, reportsExpanded]);
 
@@ -127,12 +138,12 @@ const [pendingCounts, setPendingCounts] = useState({ requests: 0, beneficiaries:
       if (rect) setFlyoutPos({ top: rect.top, left: rect.right + 8 });
     };
     place();
-    window.addEventListener('resize', place);
+    window.addEventListener("resize", place);
     // Capture phase, so scrolling the nav itself is caught as well as the page.
-    window.addEventListener('scroll', place, true);
+    window.addEventListener("scroll", place, true);
     return () => {
-      window.removeEventListener('resize', place);
-      window.removeEventListener('scroll', place, true);
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
     };
   }, [collapsed, reportsExpanded]);
 
@@ -140,8 +151,12 @@ const [pendingCounts, setPendingCounts] = useState({ requests: 0, beneficiaries:
     let active = true;
     const load = async () => {
       try {
-        const d = await api.get('/dashboard');
-        if (active) setPendingCounts({ requests: d?.requests?.pending || 0, beneficiaries: d?.beneficiaries?.pending || 0 });
+        const d = await api.get("/dashboard");
+        if (active)
+          setPendingCounts({
+            requests: d?.requests?.pending || 0,
+            beneficiaries: d?.beneficiaries?.pending || 0,
+          });
       } catch (e) {
         // ignore
       }
@@ -149,13 +164,17 @@ const [pendingCounts, setPendingCounts] = useState({ requests: 0, beneficiaries:
     load();
     const id = setInterval(load, 5000);
     const onFocus = () => load();
-    window.addEventListener('focus', onFocus);
-    return () => { active = false; clearInterval(id); window.removeEventListener('focus', onFocus); };
+    window.addEventListener("focus", onFocus);
+    return () => {
+      active = false;
+      clearInterval(id);
+      window.removeEventListener("focus", onFocus);
+    };
   }, []);
 
-useEffect(() => {
+  useEffect(() => {
     try {
-      localStorage.setItem(COLLAPSED_KEY, collapsed ? '1' : '0');
+      localStorage.setItem(COLLAPSED_KEY, collapsed ? "1" : "0");
     } catch {
       /* storage unavailable; collapse stays session-only */
     }
@@ -170,46 +189,53 @@ useEffect(() => {
   // If the viewport grows past the mobile breakpoint mid-session, drop any open
   // drawer so the desktop sidebar takes over cleanly.
   useEffect(() => {
-    const mq = window.matchMedia('(max-width: 860px)');
-    const onChange = (event) => { if (!event.matches) setMobileOpen(false); };
-    mq.addEventListener('change', onChange);
-    return () => mq.removeEventListener('change', onChange);
+    const mq = window.matchMedia("(max-width: 860px)");
+    const onChange = (event) => {
+      if (!event.matches) setMobileOpen(false);
+    };
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
   }, []);
 
   // Escape closes the drawer, mirroring how the collapsed-sidebar flyout is
   // dismissed.
   useEffect(() => {
     if (!mobileOpen) return undefined;
-    const onKeyDown = (event) => { if (event.key === 'Escape') setMobileOpen(false); };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") setMobileOpen(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
   }, [mobileOpen]);
 
   // While the drawer is open the page underneath should not scroll, so the
   // backdrop reads as a modal layer rather than a panel over a moving page.
   useEffect(() => {
-    document.body.style.overflow = mobileOpen ? 'hidden' : '';
-    return () => { document.body.style.overflow = ''; };
+    document.body.style.overflow = mobileOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
   }, [mobileOpen]);
 
   const logout = () => {
     api.logout();
-    toast('Signed out', 'info');
-    navigate('/login');
+    toast("Signed out", "info");
+    navigate("/login");
   };
 
   // Desktop collapses the sidebar rail; mobile drives the same button as a drawer
   // open/close. The button's label and aria-expanded reflect whichever state is
   // live, and the collapsed class is never applied on mobile so the drawer always
   // opens into the full sidebar.
-  const isMobile = window.matchMedia('(max-width: 860px)').matches;
+  const isMobile = window.matchMedia("(max-width: 860px)").matches;
   const navExpanded = isMobile ? mobileOpen : !collapsed;
   const sidebarClass = isMobile
-    ? `sidebar${mobileOpen ? ' open' : ''}`
-    : `sidebar${collapsed ? ' collapsed' : ''}`;
+    ? `sidebar${mobileOpen ? " open" : ""}`
+    : `sidebar${collapsed ? " collapsed" : ""}`;
 
   const toggleNav = () => {
-    if (window.matchMedia('(max-width: 860px)').matches) setMobileOpen((o) => !o);
+    if (window.matchMedia("(max-width: 860px)").matches)
+      setMobileOpen((o) => !o);
     else setCollapsed((c) => !c);
   };
 
@@ -225,14 +251,24 @@ useEffect(() => {
         </div>
         <nav className="nav" id="main-nav">
           {mainLinks.map((l) => (
-            <NavLink key={l.to} to={l.to} end={l.end} title={l.label} aria-label={l.label}>
+            <NavLink
+              key={l.to}
+              to={l.to}
+              end={l.end}
+              title={l.label}
+              aria-label={l.label}
+            >
               <Icon name={l.icon} size={18} />
               <span className="txt">{l.label}</span>
-              {l.to === '/requests' && pendingCounts.requests > 0 && (
-                <span className="badge amber" style={{ marginLeft: 'auto' }}>{pendingCounts.requests}</span>
+              {l.to === "/requests" && pendingCounts.requests > 0 && (
+                <span className="badge amber" style={{ marginLeft: "auto" }}>
+                  {pendingCounts.requests}
+                </span>
               )}
-{l.to === '/beneficiaries' && pendingCounts.beneficiaries > 0 && (
-                <span className="badge amber" style={{ marginLeft: 'auto' }}>{pendingCounts.beneficiaries}</span>
+              {l.to === "/beneficiaries" && pendingCounts.beneficiaries > 0 && (
+                <span className="badge amber" style={{ marginLeft: "auto" }}>
+                  {pendingCounts.beneficiaries}
+                </span>
               )}
             </NavLink>
           ))}
@@ -244,7 +280,7 @@ useEffect(() => {
               <button
                 type="button"
                 ref={reportsBtnRef}
-                className={`nav-parent${inReports ? ' active' : ''}`}
+                className={`nav-parent${inReports ? " active" : ""}`}
                 onClick={() => setReportsOpen(!reportsExpanded)}
                 aria-expanded={reportsExpanded}
                 aria-controls="reports-submenu"
@@ -258,7 +294,12 @@ useEffect(() => {
               {/* Expanded sidebar: an indented list in the flow. Collapsed sidebar:
                   the same list, floating beside the sidebar as a flyout. */}
               {reportsExpanded && !collapsed && (
-                <div id="reports-submenu" className="nav-submenu" role="group" aria-label="Report categories">
+                <div
+                  id="reports-submenu"
+                  className="nav-submenu"
+                  role="group"
+                  aria-label="Report categories"
+                >
                   {reportCategories.map((category) => (
                     <NavLink
                       key={category.slug}
@@ -276,7 +317,11 @@ useEffect(() => {
                 <div
                   id="reports-submenu"
                   className="nav-submenu flyout"
-                  style={flyoutPos ? { top: flyoutPos.top, left: flyoutPos.left } : { visibility: 'hidden' }}
+                  style={
+                    flyoutPos
+                      ? { top: flyoutPos.top, left: flyoutPos.left }
+                      : { visibility: "hidden" }
+                  }
                   role="group"
                   aria-label="Report categories"
                 >
@@ -297,13 +342,19 @@ useEffect(() => {
 
           {/* User Management stays last, below the Reports group. */}
           {trailingLinks.map((l) => (
-            <NavLink key={l.to} to={l.to} end={l.end} title={l.label} aria-label={l.label}>
+            <NavLink
+              key={l.to}
+              to={l.to}
+              end={l.end}
+              title={l.label}
+              aria-label={l.label}
+            >
               <Icon name={l.icon} size={18} />
               <span className="txt">{l.label}</span>
             </NavLink>
           ))}
         </nav>
-<div className="side-foot">
+        <div className="side-foot">
           <div className="user">{displayName(user)}</div>
           <div className="role">{roleLabel(user?.role)}</div>
           <button className="btn sm ghost" onClick={logout}>
@@ -312,7 +363,7 @@ useEffect(() => {
           </button>
         </div>
       </aside>
-<main className="content">
+      <main className="content">
         <BrandMotif />
         <div className="app-bar">
           <button
@@ -322,14 +373,17 @@ useEffect(() => {
             aria-label="Toggle sidebar"
             aria-expanded={navExpanded}
             aria-controls="main-nav"
-            title={navExpanded ? 'Close sidebar' : 'Open sidebar'}
+            title={navExpanded ? "Close sidebar" : "Open sidebar"}
           >
             <Icon name="menu" size={20} />
           </button>
         </div>
         <ConnectionBanner />
         {mobileOpen && (
-          <div className="sidebar-backdrop" onClick={() => setMobileOpen(false)} />
+          <div
+            className="sidebar-backdrop"
+            onClick={() => setMobileOpen(false)}
+          />
         )}
         <Outlet />
       </main>

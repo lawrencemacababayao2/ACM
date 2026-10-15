@@ -124,6 +124,7 @@ target_type ENUM('all','farmer','fisherfolk','livestock_owner') NOT NULL DEFAULT
     type ENUM('announcement','program','training','general') NOT NULL DEFAULT 'announcement',
   sms_sent TINYINT(1) NOT NULL DEFAULT 0,
   notified TINYINT(1) NOT NULL DEFAULT 0,
+  notified_types JSON NULL,
   created_by INT DEFAULT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -146,6 +147,7 @@ target_type ENUM('all','farmer','fisherfolk','livestock_owner','public') NOT NUL
   send_sms TINYINT(1) NOT NULL DEFAULT 0,
   sms_sent TINYINT(1) NOT NULL DEFAULT 0,
   notified TINYINT(1) NOT NULL DEFAULT 0,
+  notified_types JSON NULL,
   status ENUM('draft','published') NOT NULL DEFAULT 'draft',
   published_at DATETIME NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -188,6 +190,7 @@ CREATE TABLE trainings (
   send_sms TINYINT(1) NOT NULL DEFAULT 0,
   sms_sent TINYINT(1) NOT NULL DEFAULT 0,
   notified TINYINT(1) NOT NULL DEFAULT 0,
+  notified_types JSON NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );

@@ -7,7 +7,10 @@ import { idempotent } from '../middleware/idempotency.js';
 import { wrap, HttpError } from '../lib/utils.js';
 import { trainingLifecycle } from '../lib/lifecycle.js';
 import {
+  normalizeTargetTypes,
   readTargetTypes,
+  readNotifiedTypes,
+  newlyTargeted,
   legacyTargetType,
   toJsonColumn,
   requireTargetTypes,
@@ -52,22 +55,30 @@ async function ensurePublishedNotify(training) {
   const messageBis = `${training.title} - ${training.description || ''}${scheduleBis}\n\nPara sa dugang detalye, adto sa AgriConnect mobile app.`.trim();
   // Recipients are unioned across every selected type, not narrowed to one.
   const categories = readTargetTypes(training);
+  // Only the target types not announced on an earlier publish get a fresh
+  // in-app notification + push, so re-targeting a live training reaches the
+  // newly added audience without spamming the original one.
+  const pending = newlyTargeted(categories, readNotifiedTypes(training));
   const wantSms = training.send_sms && !training.sms_sent;
-  if (training.notified && !wantSms) return { app: 0, sms: 0, pushed: 0 };
+  if (!pending.length && !wantSms) return { app: 0, sms: 0, pushed: 0 };
 
   let app = 0;
   let sms = 0;
   let pushed = 0;
-  if (!training.notified) {
-    app = (await notifyVerifiedApp({ subject, subjectBis, message, messageBis, categories, notificationType: 'training' })).length;
-    pushed = await sendPush({ subject, subjectBis, message, messageBis, categories });
+  if (pending.length) {
+    app = (await notifyVerifiedApp({ subject, subjectBis, message, messageBis, categories: pending, notificationType: 'training' })).length;
+    pushed = await sendPush({
+      subject, subjectBis, message, messageBis, categories: pending,
+      data: { screen: 'inbox', kind: 'training', id: training.id },
+    });
   }
   if (wantSms) {
     sms = (await broadcastToVerified({ subject, subjectBis, message, messageBis, categories, notificationType: 'training' })).length;
   }
+  const announced = normalizeTargetTypes([...readNotifiedTypes(training), ...categories]);
   await pool.query(
-    'UPDATE trainings SET notified = 1, sms_sent = CASE WHEN ? THEN 1 ELSE sms_sent END WHERE id = ?',
-    [wantSms, training.id]
+    'UPDATE trainings SET notified = 1, notified_types = ?, sms_sent = CASE WHEN ? THEN 1 ELSE sms_sent END WHERE id = ?',
+    [toJsonColumn(announced), wantSms, training.id]
   );
   return { app, sms, pushed };
 }

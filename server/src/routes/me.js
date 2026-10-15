@@ -23,11 +23,15 @@ const router = Router();
 const mobileChangeMinute = makeLimiter('mobile-change-minute', {
   ...rateLimits.otp.phoneMinute,
   keyGenerator: (req) => phoneKey(req, 'newMobile'),
+  // Only a request that actually sent a code spends the per-number budget. If the
+  // provider fails (or the password/format is wrong) the user can immediately retry.
+  skipFailedRequests: true,
   message: 'Please wait before requesting another verification code.',
 });
 const mobileChangeHour = makeLimiter('mobile-change-hour', {
   ...rateLimits.otp.phoneHour,
   keyGenerator: (req) => phoneKey(req, 'newMobile'),
+  skipFailedRequests: true,
   message: 'Too many codes requested for this number. Please try again later.',
 });
 
@@ -135,7 +139,7 @@ router.post('/mobile/request-change', auth, mobileChangeMinute, mobileChangeHour
   if (dup) throw new HttpError(409, dup.message, { field: 'newMobile' });
 
   const wait = await resendWaitSeconds(valid.mobile, MOBILE_PURPOSE);
-  if (wait > 0) throw new HttpError(429, `Please wait ${wait} seconds before requesting another code`, { retryAfter: wait });
+  if (wait > 0) throw new HttpError(429, `Please wait ${wait} seconds before requesting another code`, { retryAfterSeconds: wait });
 
   // Platform daily SMS ceiling + credit floor, shared with the registration OTP.
   const daily = consumeDailyBudget('otp-sms', rateLimits.otp.dailySmsCap);

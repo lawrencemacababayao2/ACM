@@ -71,6 +71,35 @@ export function readTargetTypes(row) {
   return normalizeTargetTypes(row.target_type);
 }
 
+// Reading side for the `notified_types` JSON column: the target types a post
+// has already been announced to. Used on republish so only the newly added
+// types get a fresh app-notification + push, instead of the whole audience.
+export function readNotifiedTypes(row) {
+  if (!row) return [];
+  const raw = row.notified_types ?? row.notifiedTypes;
+  if (Array.isArray(raw)) return normalizeTargetTypes(raw);
+  if (typeof raw === 'string' && raw.trim()) {
+    try {
+      return normalizeTargetTypes(JSON.parse(raw));
+    } catch {
+      // Not JSON; treat as nothing-notified so the post is announced normally.
+    }
+  }
+  return [];
+}
+
+// The types in `categories` that have not yet been announced to, given the
+// types already announced (`notifiedTypes`). 'all' covers every registered
+// beneficiary, so a named registered type is considered covered once 'all' has
+// gone out; 'public' has no registered audience and is only covered by itself.
+export function newlyTargeted(categories, notifiedTypes) {
+  const cats = normalizeTargetTypes(categories);
+  const done = normalizeTargetTypes(notifiedTypes);
+  return cats.filter(
+    (t) => !done.includes(t) && !(done.includes(ALL_TARGET) && t !== PUBLIC_TARGET)
+  );
+}
+
 // The single value the legacy column holds: the one type when exactly one is
 // targeted, and 'all' for anything wider. Deriving it here (rather than letting
 // each route decide) is what keeps the old consumers and the new list from

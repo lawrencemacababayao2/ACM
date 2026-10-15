@@ -8,7 +8,7 @@ import { WEEKDAYS, buildGrid, toISO } from '../lib/dateUtils.js';
  * differently (range edges vs a single selected day) without duplicating the
  * grid itself.
  */
-export default function CalendarGrid({ view, onShiftMonth, classFor, onDayClick, isDayDisabled, disableNext = false, yearOptions = [], onJumpYear }) {
+export default function CalendarGrid({ view, onShiftMonth, classFor, onDayClick, isDayDisabled, disablePrev = false, disableNext = false, yearOptions = [], onJumpYear }) {
   const grid = useMemo(() => buildGrid(view), [view]);
   const today = new Date();
 
@@ -17,7 +17,7 @@ export default function CalendarGrid({ view, onShiftMonth, classFor, onDayClick,
   return (
     <>
       <div className="date-picker-head">
-        <button type="button" className="date-picker-nav" aria-label="Previous month" onClick={() => onShiftMonth(-1)}>
+        <button type="button" className="date-picker-nav" aria-label="Previous month" disabled={disablePrev} onClick={() => onShiftMonth(-1)}>
           <Icon name="chevron-left" size={16} />
         </button>
         <div className="date-picker-title">
