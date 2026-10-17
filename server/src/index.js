@@ -30,6 +30,7 @@ import meRoutes from './routes/me.js';
 import homeRoutes from './routes/home.js';
 import { authenticatedLimiter, publicDataLimiter } from './middleware/rateLimit.js';
 import { simpleCache } from './middleware/simpleCache.js';
+import { ensureSchema } from './lib/ensureSchema.js';
 
 dotenv.config();
 
@@ -132,6 +133,13 @@ const PORT = Number(process.env.PORT || 3001);
 const HOST = process.env.HOST || '0.0.0.0';
 app.listen(PORT, HOST, async () => {
   console.log(`AgriConnect Medina API running on http://${HOST}:${PORT}`);
+  // A deploy does not run server/migrations/*.sql, so a database that predates a
+  // column would only fail later, mid-request. Self-heal the ones the code needs.
+  try {
+    await ensureSchema();
+  } catch (err) {
+    console.warn('[warn] schema check failed:', err.message);
+  }
   // Admins sign in by mobile number. An account with no mobile set cannot log in
   // through the portal at all, so flag it on startup while it is cheap to fix
   // (User Management > edit > set the number). The check is advisory only.

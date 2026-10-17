@@ -89,7 +89,7 @@ const DICT = {
   "Upcoming activities from the Municipal Agriculture Office — open to registered beneficiaries and the general public alike.":
     "Umaabot nga mga kalihokan sa Municipal Agriculture Office — bukas sa mga rehistradong benepisyaryo ug sa publiko.",
   When: "Kanus-a",
-  Type: "Matang",
+  Type: "Klase",
   Category: "Kategoriya",
   Upcoming: "Umaabot",
   "This week": "Karong semana",
