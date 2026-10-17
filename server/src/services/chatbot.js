@@ -162,7 +162,7 @@ async function loadOwnRequests(userId) {
     `SELECT id, type, subject, details, quantity, preferred_date, status, scheduled_for,
             admin_notes, created_at, updated_at
      FROM requests WHERE beneficiary_id = ? ORDER BY created_at DESC, id DESC LIMIT 10`,
-    [ben.id]
+    [ben[0].id]
   );
   return rows;
 }
