@@ -57,14 +57,29 @@ export const rateLimits = {
   },
 
   chatbot: {
-    // Anonymous (landing) visitors: 10/min and 60/day per visitor.
+    // Per-minute burst limits, keyed by identity (user id, or IP + anon cookie).
     anonPerMinute: envInt('RL_CHATBOT_ANON_PER_MIN', 10),
-    anonPerDay: envInt('RL_CHATBOT_ANON_PER_DAY', 60),
-    // Signed-in users get their own, higher allowance keyed by user id.
     userPerMinute: envInt('RL_CHATBOT_USER_PER_MIN', 40),
-    // Global budget across ALL callers for the whole day. When reached the AI
-    // provider is never called again that day.
-    dailyCap: envInt('CHATBOT_DAILY_CAP', 1000),
+
+    // Daily question quotas. The two audiences sit in SEPARATE pools: one visitor
+    // can never draw on the signed-in allowance and vice versa. Inside a pool an
+    // identity has its own counter and the whole audience shares a second one.
+    userPerDay: envInt('RL_CHATBOT_USER_PER_DAY', 20),
+    userSharedPerDay: envInt('RL_CHATBOT_USER_SHARED_PER_DAY', 800),
+    anonPerDay: envInt('RL_CHATBOT_ANON_PER_DAY', 5),
+    anonSharedPerDay: envInt('RL_CHATBOT_ANON_SHARED_PER_DAY', 200),
+    // Abuse net: the anonymous id rides in a cookie the visitor can clear, so a
+    // per-IP ceiling catches one network minting fresh ids to reset its allowance.
+    anonPerIpPerDay: envInt('RL_CHATBOT_ANON_PER_IP_DAY', 15),
+
+    // Global OpenRouter spend guard, independent of the pool split. Counted in
+    // tokens/day from the provider's reported usage; both pools together must stay
+    // under it. When reached the provider is not called again until the reset.
+    tokenDailyBudget: envInt('LLM_DAILY_TOKEN_BUDGET', 2_000_000),
+
+    // Hour (0-23, Asia/Manila) at which every daily counter rolls over.
+    resetHour: envInt('RL_CHATBOT_RESET_HOUR', 0),
+
     // A visitor who sends more than this many messages inside captchaWindowMs is
     // asked to solve a CAPTCHA (only when Turnstile is enabled).
     captchaAfter: envInt('RL_CHATBOT_CAPTCHA_AFTER', 5),
@@ -136,9 +151,9 @@ export const rateLimits = {
   // The AI provider call itself is bounded so one slow request cannot hold a
   // connection forever or produce an unbounded bill.
   llm: {
-    timeoutMs: envInt('LLM_TIMEOUT_MS', 15_000),
-    maxOutputTokens: envInt('LLM_MAX_OUTPUT_TOKENS', 400),
-    maxOutputChars: envInt('LLM_MAX_OUTPUT_CHARS', 4000),
+    timeoutMs: envInt('LLM_TIMEOUT_MS', 30_000),
+    maxOutputTokens: envInt('LLM_MAX_OUTPUT_TOKENS', 1200),
+    maxOutputChars: envInt('LLM_MAX_OUTPUT_CHARS', 8000),
   },
 };
 

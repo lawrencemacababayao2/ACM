@@ -37,7 +37,11 @@ function parseCookies(header) {
 export function anonSession(req, res, next) {
   const cookies = parseCookies(req.headers.cookie);
   let id = cookies[COOKIE_NAME];
-  if (!ID_RE.test(id || '')) {
+  // Whether the visitor actually returned the cookie we handed out. A quota keyed
+  // by the id only survives a round-trip; without one the caller falls back to
+  // being counted by IP, so clearing the cookie cannot reset a daily allowance.
+  const persisted = ID_RE.test(id || '');
+  if (!persisted) {
     id = crypto.randomBytes(18).toString('base64url');
     const bits = [
       `${COOKIE_NAME}=${id}`,
@@ -51,7 +55,7 @@ export function anonSession(req, res, next) {
     res.append('Set-Cookie', bits.join('; '));
   }
   // Read by the anonymous key functions; never trusted for anything else.
-  req.anon = { id };
+  req.anon = { id, persisted };
   return next();
 }
 

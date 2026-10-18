@@ -522,7 +522,7 @@ function faqFallback(message, scope, lang) {
     const done = (answer, source) => {
       const text = truncateAnswer(answer, rateLimits.llm.maxOutputChars, replyLang);
       console.log(`[chatbot] source=${source} chars=${text.length}`);
-      resolve({ answer: text, source });
+      resolve({ answer: text, source, tokens: 0 });
     };
     const run = async () => {
       try {
@@ -730,8 +730,9 @@ export async function answer(message, lang, scope, history = []) {
       return faqFallback(message, scope, lang);
     }
     const trimmed = truncateAnswer(content, rateLimits.llm.maxOutputChars, replyLang);
-    console.log(`[chatbot] source=AI chars=${trimmed.length}`);
-    return { answer: trimmed, source: 'AI' };
+    const tokens = Number(data?.usage?.total_tokens) || 0;
+    console.log(`[chatbot] source=AI chars=${trimmed.length} tokens=${tokens}`);
+    return { answer: trimmed, source: 'AI', tokens };
   } catch (err) {
     console.warn(`[chatbot] fallback reason=${err?.name || 'Error'}`);
     return faqFallback(message, scope, lang);

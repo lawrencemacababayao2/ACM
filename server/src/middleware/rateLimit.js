@@ -138,19 +138,14 @@ export const authenticatedLimiter = makeLimiter('authenticated', {
   message: 'You are making requests too quickly. Please slow down.',
 });
 
-// Chatbot, anonymous: 10/min and 60/day per visitor (IP + anonymous session).
+// Chatbot per-minute burst limits. The daily question quotas are enforced in the
+// route itself (see services/chatbotQuota.js) because they need a shared pool and
+// a refund path; these only stop a rapid burst.
 export const chatbotAnonMinute = makeLimiter('chatbot-anon-minute', {
   windowMs: 60_000,
   max: rateLimits.chatbot.anonPerMinute,
   keyGenerator: anonKey,
   message: 'You are asking too quickly. Please wait a moment before sending another question.',
-});
-
-export const chatbotAnonDaily = makeLimiter('chatbot-anon-daily', {
-  windowMs: 24 * 60 * 60 * 1000,
-  max: rateLimits.chatbot.anonPerDay,
-  keyGenerator: anonKey,
-  message: 'You have reached today\'s question limit for visitors. Please try again tomorrow.',
 });
 
 // Chatbot, signed in: a higher allowance keyed by user id.
@@ -162,13 +157,10 @@ export const chatbotUserMinute = makeLimiter('chatbot-user-minute', {
 });
 
 // Dispatcher: a signed-in caller uses the user allowance, everyone else the
-// anonymous minute + day allowance.
+// anonymous allowance.
 export function chatbotLimits(req, res, next) {
   if (req.user) return chatbotUserMinute(req, res, next);
-  return chatbotAnonMinute(req, res, (err) => {
-    if (err) return next(err);
-    return chatbotAnonDaily(req, res, next);
-  });
+  return chatbotAnonMinute(req, res, next);
 }
 
 // OTP send: 1/min + 5/hour per phone, 10/hour per IP. Applied in order so the
