@@ -2,6 +2,9 @@ import React, { useMemo, useState } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import Icon from './Icon.jsx';
+import FilterPill from './FilterPill.jsx';
+
+const PAGE_SIZES = [10, 25, 50, 100];
 
 // Sorting lives here rather than in each page so every table that opts in gets
 // identical behaviour: click to sort, click again to flip direction. The parent
@@ -15,8 +18,11 @@ export default function DataTable({
   sortDir = 'asc',
   onSort,
   sortable = null,
+  paginate = true,
 }) {
   const list = Array.isArray(rows) ? rows : [];
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
   const sorted = useMemo(() => {
     if (!sortKey) return list;
@@ -34,6 +40,12 @@ export default function DataTable({
       return sortDir === 'desc' ? -cmp : cmp;
     });
   }, [list, sortKey, sortDir]);
+
+  const paged = paginate && !sortable;
+  const pageCount = Math.max(1, Math.ceil(sorted.length / pageSize));
+  const current = Math.min(page, pageCount);
+  const start = (current - 1) * pageSize;
+  const pageRows = paged ? sorted.slice(start, start + pageSize) : sorted;
 
   return (
     <div className="card table-card" style={{ padding: 0 }}>
@@ -70,7 +82,7 @@ export default function DataTable({
             {!sorted.length && (
               <tr><td className="empty" colSpan={columns.length}>No records found</td></tr>
             )}
-            {sorted.map((row, index) => {
+            {pageRows.map((row, index) => {
               const shared = {
                 key: row[keyField],
                 className: [
@@ -105,6 +117,28 @@ export default function DataTable({
           </tbody>
         </table>
       </div>
+      {paged && (
+        <div className="pager table-pager">
+          <span className="count">
+            {sorted.length
+              ? `${start + 1}–${Math.min(start + pageSize, sorted.length)} of ${sorted.length}`
+              : 'No records'}
+          </span>
+          <FilterPill
+            ariaLabel="Rows per page"
+            options={PAGE_SIZES.map((size) => ({ value: size, label: `${size} per page` }))}
+            value={pageSize}
+            onChange={(next) => { setPageSize(Number(next)); setPage(1); }}
+          />
+          <button type="button" className="btn sm" disabled={current <= 1} onClick={() => setPage(current - 1)}>
+            Previous
+          </button>
+          <span className="page-now">Page {current} of {pageCount}</span>
+          <button type="button" className="btn sm" disabled={current >= pageCount} onClick={() => setPage(current + 1)}>
+            Next
+          </button>
+        </div>
+      )}
     </div>
   );
 }

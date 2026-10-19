@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import GlobalStyle, { useInjectFonts } from "../components/GlobalStyle";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import FloatingQR from "../components/FloatingQR";
 import ChatWidget, { CHAT_PAGE } from "../components/ChatWidget";
 import HomePage from "../pages/HomePage";
 import AboutContactPage from "../pages/AboutContactPage";
@@ -105,6 +106,7 @@ export default function App() {
         {page === PROGRAMS_PAGE && <ProgramsEventsPage />}
         {serviceKey && <ServiceDetailPage serviceKey={serviceKey} />}
         <Footer navigate={navigate} />
+        <FloatingQR />
         <ChatWidget active={page === CHAT_PAGE} />
       </div>
     </LangProvider>

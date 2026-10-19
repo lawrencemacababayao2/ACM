@@ -437,7 +437,7 @@ input, select, textarea { font: inherit; }
 .table-card { border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; }
 .table-card .table { border: 0; border-radius: 0; }
 /* The header uses a very light tint of the brand green, not a new palette entry. */
-.table-card thead th { background: #f2f8f5; border-bottom: 1px solid var(--border); }
+.table-card thead th { background: #f2f8f5; box-shadow: inset 0 -1px 0 var(--border); }
 .table-card thead th:first-child { border-top-left-radius: 0; }
 
 .th-sort {
@@ -452,12 +452,14 @@ input, select, textarea { font: inherit; }
 .th-sort:hover .th-sort-icon { opacity: .7; }
 .th-sort.active .th-sort-icon { opacity: 1; color: var(--green); }
 
-.table-wrap { overflow-x: auto; }
+.table-wrap { overflow: auto; max-height: 62vh; }
 .table { width: 100%; border-collapse: collapse; }
 .table th {
   text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .05em;
-  color: var(--muted); font-weight: 600; padding: 11px 14px; border-bottom: 1px solid var(--border);
+  color: var(--muted); font-weight: 600; padding: 11px 14px;
   white-space: nowrap; background: #fafbfc;
+  position: sticky; top: 0; z-index: 2;
+  box-shadow: inset 0 -1px 0 var(--border);
 }
 .table td { padding: 12px 14px; border-bottom: 1px solid var(--border-soft); vertical-align: top; font-size: 13.5px; }
 .table tr:last-child td { border-bottom: none; }
@@ -1486,6 +1488,10 @@ input, select, textarea { font: inherit; }
 .pager { display: flex; align-items: center; gap: 10px; justify-content: flex-end; margin-top: 12px; flex-wrap: wrap; }
 .pager .count { color: var(--muted); font-size: 12.5px; margin-right: auto; }
 .pager .page-now { color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.table-card .table-pager {
+  margin-top: 0; padding: 10px 14px;
+  border-top: 1px solid var(--border-soft); background: var(--white);
+}
 
 /* Touch input has no hover and a coarse pointer, so every tappable control keeps
    a 44px target. The size is added inside the control (a larger native box or a

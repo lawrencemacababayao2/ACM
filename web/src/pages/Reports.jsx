@@ -689,7 +689,7 @@ const fieldGroups = useMemo(() => {
         )}
       </div>
 
-      {skeleton ? <TableSkeleton rows={6} columns={columns} /> : <DataTable columns={columns} rows={rows} keyField="id" />}
+      {skeleton ? <TableSkeleton rows={6} columns={columns} /> : <DataTable columns={columns} rows={rows} keyField="id" paginate={false} />}
 
       <div className="pager">
         <span className="count">

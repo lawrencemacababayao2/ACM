@@ -903,7 +903,7 @@ const handleExport = async () => {
         genderLabel(r.gender),
         formatDate(r.birthday),
         r.barangay || 'N/A',
-        r.rsbsa_number || 'N/A',
+        formatRsbsaInput(r.rsbsa_number) || 'N/A',
         r.status || 'N/A',
         formatDate(r.created_at),
       ]),

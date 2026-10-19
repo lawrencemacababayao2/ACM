@@ -13,8 +13,8 @@ const DICT = {
   "Ask AI": "Pangutana sa AI",
   "Download App": "I-download ang App",
   "About MAO": "Bahin sa MAO",
-  Services: "Mga Serbisyo",
-  "Why Use AgriConnect?": "Ngano nga AgriConnect?",
+  Services: "Serbisyo",
+  "Why Use AgriConnect?": "Nganong AgriConnect?",
   FAQ: "Mga Pangutana",
   Contact: "Kontak",
   "MUNICIPAL AGRICULTURE OFFICE": "MUNISIPAL NGA OPISINA SA AGRIKULTURA",
@@ -83,7 +83,7 @@ const DICT = {
   "How can the office help you?": "Unsaon sa opisina pagtabang kanimo?",
 
   // Programs & Events page and the home strip
-  "Programs & Events": "Mga Programa ug mga Kalihokan",
+  "Programs & Events": "Mga Programa ug Kalihokan",
   "Programs and trainings you can join":
     "Mga programa ug training nga apilan nimo",
   "Upcoming activities from the Municipal Agriculture Office — open to registered beneficiaries and the general public alike.":
