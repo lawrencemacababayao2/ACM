@@ -488,4 +488,16 @@ router.post('/:id/reject', auth, adminOnly, idempotent(), wrap(async (req, res) 
   res.json({ ok: true });
 }));
 
+// DELETE /api/requests/:id  (admin; removes a rejected request outright)
+// request_status_log and notifications cascade from the FK, so one row delete
+// clears the request, its timeline and its notifications together.
+router.delete('/:id', auth, adminOnly, wrap(async (req, res) => {
+  if (!/^\d+$/.test(req.params.id)) throw new HttpError(404, 'Request not found');
+  const [rows] = await pool.query('SELECT id, status FROM requests WHERE id = ?', [req.params.id]);
+  if (!rows[0]) throw new HttpError(404, 'Request not found');
+  if (rows[0].status !== 'rejected') throw new HttpError(400, 'Only rejected requests can be deleted');
+  await pool.query('DELETE FROM requests WHERE id = ?', [req.params.id]);
+  res.json({ ok: true });
+}));
+
 export default router;

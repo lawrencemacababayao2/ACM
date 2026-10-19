@@ -50,6 +50,10 @@ function toSafeUser(row) {
     middle_name: row.middle_name || null,
     last_name: row.last_name || null,
     role: row.role,
+    is_active: row.is_active == null ? 1 : Number(row.is_active),
+    profile_pic: row.profile_pic || null,
+    created_at: row.created_at || null,
+    last_active_at: row.last_active_at || null,
     preferences: {
       push_notifications: row.push_notifications == null ? 1 : Number(row.push_notifications),
       sms_notifications: row.sms_notifications == null ? 1 : Number(row.sms_notifications),
@@ -593,6 +597,7 @@ if (!idDocument || typeof idDocument !== 'string') {
 router.get('/me', auth, wrap(async (req, res) => {
   const [rows] = await pool.query(
     'SELECT id, email, mobile_number, first_name, middle_name, last_name, role, ' +
+    'is_active, profile_pic, created_at, last_active_at, ' +
     'push_notifications, sms_notifications, language FROM users WHERE id = ? LIMIT 1',
     [req.user.id]
   );

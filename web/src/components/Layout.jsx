@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { api } from "../api.js";
+import { api, mediaUrl } from "../api.js";
 import { useToast } from "../toast.jsx";
 import Icon from "./Icon.jsx";
 import BrandMotif from "./BrandMotif.jsx";
@@ -12,7 +12,7 @@ const COLLAPSED_KEY = "acm_sidebar_collapsed";
 // Friendly role shown under the account name in the sidebar footer. The stored
 // value is 'super_admin' / 'admin'.
 const roleLabel = (v) =>
-  v === "super_admin" ? "Head" : v === "admin" ? "Admin" : v;
+  v === "super_admin" ? "Superadmin" : v === "admin" ? "Admin" : v;
 
 // The account advertises its name first, email second - sign-in itself is by
 // mobile, so the mailbox is not shown on every screen.
@@ -48,8 +48,15 @@ const LINKS = [
 export default function Layout() {
   const navigate = useNavigate();
   const toast = useToast();
-  const user = api.user();
   const location = useLocation();
+
+  const [user, setUser] = useState(() => api.user());
+
+  useEffect(() => {
+    const sync = () => setUser(api.user());
+    window.addEventListener("acm:user-updated", sync);
+    return () => window.removeEventListener("acm:user-updated", sync);
+  }, []);
 
   const [collapsed, setCollapsed] = useState(() => {
     try {
@@ -62,6 +69,8 @@ export default function Layout() {
   const [pendingCounts, setPendingCounts] = useState({
     requests: 0,
     beneficiaries: 0,
+    programs: 0,
+    trainings: 0,
   });
 
   // Mobile uses a drawer rather than the desktop collapse. The header burger opens
@@ -75,6 +84,8 @@ export default function Layout() {
   const reportsRef = useRef(null);
   const reportsBtnRef = useRef(null);
   const [flyoutPos, setFlyoutPos] = useState(null);
+
+  const [now, setNow] = useState(() => new Date());
 
   const visibleLinks = LINKS.filter(
     (l) => !l.superAdminOnly || user?.role === "super_admin",
@@ -90,6 +101,20 @@ export default function Layout() {
   // the parent reads as active on the moment the area is entered. The active child
   // needs no equivalent here: NavLink applies the active class to itself.
   const inReports = isReportsArea(location.pathname);
+
+  const crumbLabel = (() => {
+    if (location.pathname === "/") return "Dashboard";
+    if (location.pathname === "/profile") return "Profile";
+    const flat = LINKS.find(
+      (l) => l.to !== "/" && location.pathname.startsWith(l.to),
+    );
+    if (flat) return flat.label;
+    const category = reportCategories.find((c) =>
+      location.pathname.startsWith(c.route),
+    );
+    if (category) return category.label;
+    return isReportsArea(location.pathname) ? "Reports" : "Dashboard";
+  })();
 
   const reportsExpanded = reportsOpen ?? inReports;
 
@@ -156,6 +181,8 @@ export default function Layout() {
           setPendingCounts({
             requests: d?.requests?.pending || 0,
             beneficiaries: d?.beneficiaries?.pending || 0,
+            programs: d?.upcomingPrograms || 0,
+            trainings: d?.upcomingTrainings || 0,
           });
       } catch (e) {
         // ignore
@@ -217,6 +244,11 @@ export default function Layout() {
     };
   }, [mobileOpen]);
 
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
   const logout = () => {
     api.logout();
     toast("Signed out", "info");
@@ -261,13 +293,23 @@ export default function Layout() {
               <Icon name={l.icon} size={18} />
               <span className="txt">{l.label}</span>
               {l.to === "/requests" && pendingCounts.requests > 0 && (
-                <span className="badge amber" style={{ marginLeft: "auto" }}>
+                <span className="badge red" style={{ marginLeft: "auto" }}>
                   {pendingCounts.requests}
                 </span>
               )}
               {l.to === "/beneficiaries" && pendingCounts.beneficiaries > 0 && (
-                <span className="badge amber" style={{ marginLeft: "auto" }}>
+                <span className="badge red" style={{ marginLeft: "auto" }}>
                   {pendingCounts.beneficiaries}
+                </span>
+              )}
+              {l.to === "/programs" && pendingCounts.programs > 0 && (
+                <span className="badge red" style={{ marginLeft: "auto" }}>
+                  {pendingCounts.programs}
+                </span>
+              )}
+              {l.to === "/trainings" && pendingCounts.trainings > 0 && (
+                <span className="badge red" style={{ marginLeft: "auto" }}>
+                  {pendingCounts.trainings}
                 </span>
               )}
             </NavLink>
@@ -355,8 +397,7 @@ export default function Layout() {
           ))}
         </nav>
         <div className="side-foot">
-          <div className="user">{displayName(user)}</div>
-          <div className="role">{roleLabel(user?.role)}</div>
+          <div className="office">MUNICIPAL AGRICULTURE OFFICE OF MEDINA</div>
           <button className="btn sm ghost" onClick={logout}>
             <Icon name="logout" size={14} />
             Log out
@@ -377,6 +418,64 @@ export default function Layout() {
           >
             <Icon name="menu" size={20} />
           </button>
+          <button
+            type="button"
+            className="appbar-account"
+            onClick={() => navigate("/profile")}
+            title="My profile"
+            aria-label="My profile"
+          >
+            <span className="appbar-avatar-wrap">
+              <span className="appbar-avatar">
+                {user?.profile_pic ? (
+                  <img src={mediaUrl(user.profile_pic)} alt="" />
+                ) : (
+                  <img src="/user-icon.png" alt="" />
+                )}
+              </span>
+              {user && (
+                <span
+                  className={`appbar-avatar-status ${user.is_active ? 'on' : 'off'}`}
+                  role="img"
+                  aria-label={user.is_active ? 'Active' : 'Inactive'}
+                  title={user.is_active ? 'Active' : 'Inactive'}
+                />
+              )}
+            </span>
+            <div className="appbar-id">
+              <span className="name">{displayName(user)}</span>
+              <span className="role">{roleLabel(user?.role)}</span>
+            </div>
+            <Icon name="chevron" size={14} className="appbar-caret" />
+          </button>
+        </div>
+        <div className="app-crumb">
+          <div className="crumb-path">
+            <NavLink to="/" className="crumb-home" aria-label="Home">
+              <Icon name="home" size={13} />
+              <span>Home</span>
+            </NavLink>
+            <span className="crumb-sep">›</span>
+            <span className="crumb-current">{crumbLabel}</span>
+          </div>
+          <div className="crumb-stamp">
+            <span>
+              {now.toLocaleDateString("en-US", {
+                weekday: "short",
+                month: "long",
+                day: "numeric",
+                year: "numeric",
+              })}
+            </span>
+            <span className="crumb-pipe">|</span>
+            <span>
+              {now.toLocaleTimeString("en-US", {
+                hour: "numeric",
+                minute: "2-digit",
+                second: "2-digit",
+              })}
+            </span>
+          </div>
         </div>
         <ConnectionBanner />
         {mobileOpen && (

@@ -27,6 +27,7 @@ export async function ensureSchema() {
   await ensureColumn('announcements', 'notified_types', 'notified_types JSON NULL AFTER notified');
   await ensureColumn('programs', 'notified_types', 'notified_types JSON NULL AFTER notified');
   await ensureColumn('trainings', 'notified_types', 'notified_types JSON NULL AFTER notified');
+  await ensureColumn('users', 'profile_pic', 'profile_pic MEDIUMTEXT NULL');
   // Rows published before the column existed were announced to their whole
   // audience, so backfill them the way the migration does.
   await pool.query('UPDATE announcements SET notified_types = target_beneficiary_types WHERE notified = 1 AND notified_types IS NULL');

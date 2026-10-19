@@ -54,7 +54,8 @@ CREATE TABLE users (
 role ENUM('admin','super_admin','technician','beneficiary') NOT NULL DEFAULT 'beneficiary',
     is_active TINYINT(1) NOT NULL DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    last_active_at DATETIME NULL DEFAULT NULL
+    last_active_at DATETIME NULL DEFAULT NULL,
+    profile_pic MEDIUMTEXT DEFAULT NULL
     );
 
 -- ---------- Beneficiaries ----------

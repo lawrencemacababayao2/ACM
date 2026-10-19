@@ -53,6 +53,13 @@ const PATHS = {
       <path d="M22 20H2" />
     </>
   ),
+  home: (
+    <>
+      <path d="M3.5 10.8 12 4l8.5 6.8" />
+      <path d="M6 10v10h12V10" />
+      <path d="M10 20v-5h4v5" />
+    </>
+  ),
   // Points right at rest and is rotated by CSS when its submenu is open, so the
   // expansion state is visible without swapping the icon.
   chevron: <path d="m9 6 6 6-6 6" />,

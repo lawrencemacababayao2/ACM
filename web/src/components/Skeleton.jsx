@@ -75,9 +75,14 @@ function cellVariant(col, explicit) {
 // A placeholder for any DataTable. Renders the real header row (same labels, same
 // row height) so the layout does not jump when the data lands, then `rows` skeleton
 // rows whose cells are sized to the column's content kind at 40-90% width.
-export function TableSkeleton({ columns = [], rows = 6, cellVariants = {}, ariaLabel = 'Loading' }) {
+export function TableSkeleton({ columns = [], rows = 6, cellVariants = {}, ariaLabel = 'Loading', bare = false }) {
   return (
-    <div className="card table-card" style={{ padding: 0 }} aria-busy="true" aria-label={ariaLabel}>
+    <div
+      className={bare ? 'table-bare' : 'card table-card'}
+      style={bare ? undefined : { padding: 0 }}
+      aria-busy="true"
+      aria-label={ariaLabel}
+    >
       <div className="table-wrap">
         <table className="table skeleton-table">
           <thead>
@@ -130,45 +135,25 @@ export function TableSkeleton({ columns = [], rows = 6, cellVariants = {}, ariaL
   );
 }
 
-// Placeholder for the dashboard stat cards. Mirrors the real 3+3 layout (two
-// `.stats.dash-stats.dash-stats-3` rows) with the same tier/tone structure, so the
-// whole block resolves to identical dimensions once the numbers arrive.
-// Pass either an explicit `cards` array of `{ tier, tone }` or a number to get the
-// dashboard's default six (three tier-1 tones plus three tier-2 cards).
-export function StatCardSkeleton({ cards = 6 }) {
+export function StatCardSkeleton({ cards = 4 }) {
   const list = typeof cards === 'number'
-    ? [
-        { tier: 1, tone: 'mint', icon: 'users' },
-        { tier: 1, tone: 'amber', icon: 'clock' },
-        { tier: 1, tone: 'pink', icon: 'alert-circle' },
-        { tier: 2 },
-        { tier: 2 },
-        { tier: 2 },
-      ]
+    ? Array.from({ length: cards }, (_, i) => ({ variant: i === 2 ? 'primary' : '' }))
     : cards;
-  const groups = [];
-  for (let i = 0; i < list.length; i += 3) groups.push(list.slice(i, i + 3));
 
   return (
-    <>
-      {groups.map((group, g) => (
-        <div className="stats dash-stats dash-stats-3" key={g}>
-          {group.map((c, i) => (
-            <div
-              key={i}
-              className={`stat dash-stat ${c.tier === 1 ? `dash-stat--tier1 ${c.tone}` : 'dash-stat--tier2'}`}
-            >
-              <div className="stat-body">
-                <Skeleton width={84} height={13} radius={4} />
-                <Skeleton width={64} height={30} radius={6} />
-                {c.tier === 1 && <Skeleton width={62} height={12} radius={4} />}
-              </div>
-              {c.tier === 1 && <Skeleton width={46} height={46} radius={23} className="stat-circle-sk" />}
-            </div>
-          ))}
+    <div className="dash-kpis">
+      {list.map((c, i) => (
+        <div
+          key={i}
+          className={`card dash-card dash-kpi${c.variant === 'primary' ? ' dash-kpi--primary' : ''}`}
+        >
+          <Skeleton width={40} height={40} radius={12} />
+          <Skeleton width={96} height={12} radius={4} />
+          <Skeleton width={66} height={32} radius={6} />
+          <Skeleton width={112} height={13} radius={4} />
         </div>
       ))}
-    </>
+    </div>
   );
 }
 

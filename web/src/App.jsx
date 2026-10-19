@@ -15,6 +15,7 @@ import Requests from './pages/Requests.jsx';
 import Reports from './pages/Reports.jsx';
 import LandingContent from './pages/LandingContent.jsx';
 import UserManagement from './pages/UserManagement.jsx';
+import Profile from './pages/Profile.jsx';
 import { firstReportRoute, reportCategoriesFor } from './reportCategories.js';
 
 // Category name -> page component, resolved here rather than stored in
@@ -89,6 +90,7 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route element={<RequireAdmin><Layout /></RequireAdmin>}>
             <Route path="/" element={<Dashboard />} />
+            <Route path="/profile" element={<Profile />} />
             <Route path="/beneficiaries/:beneficiaryId?" element={<Beneficiaries />} />
             <Route path="/announcements" element={<Announcements />} />
             <Route path="/programs" element={<Programs />} />

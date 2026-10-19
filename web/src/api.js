@@ -114,6 +114,7 @@ export const api = {
   get: (path) => request(path),
   post: (path, body, options = {}) => request(path, { method: 'POST', body, ...options }),
   put: (path, body, options = {}) => request(path, { method: 'PUT', body, ...options }),
+  patch: (path, body, options = {}) => request(path, { method: 'PATCH', body, ...options }),
   del: (path) => request(path, { method: 'DELETE' }),
 
   async login(mobile, password) {
@@ -137,6 +138,11 @@ export const api = {
     } catch {
       return null;
     }
+  },
+
+  setUser(user) {
+    localStorage.setItem('acm_user', JSON.stringify(user || 'null'));
+    window.dispatchEvent(new Event('acm:user-updated'));
   },
 
   async download(path, filename) {

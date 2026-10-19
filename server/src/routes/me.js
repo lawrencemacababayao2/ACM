@@ -10,7 +10,7 @@ import { wrap, HttpError } from '../lib/utils.js';
 import {
   validateMobile, issueOtp, verifyOtp, resendWaitSeconds, normalizeMobile, RESEND_COOLDOWN_SECONDS,
 } from '../services/otp.js';
-import { checkUserDuplicates, checkBeneficiaryDuplicates } from '../services/duplicates.js';
+import { checkUserDuplicates, checkBeneficiaryDuplicates, checkUserDuplicateFields, duplicateErrors } from '../services/duplicates.js';
 import { passwordProblem } from '../lib/password.js';
 import { sendOne, getSmsCredits } from '../services/sms.js';
 import rateLimits from '../config/rateLimits.js';
@@ -39,6 +39,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UPLOAD_DIR = path.join(__dirname, '..', '..', 'uploads');
 
 const MOBILE_PURPOSE = 'change_mobile';
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MOBILE_RE = /^09\d{9}$/;
+const MAX_NAME_LENGTH = 80;
 
 const OTP_MESSAGES = {
   otp_missing: 'Please request a verification code first',
@@ -76,18 +80,61 @@ function saveDataUrlImage(dataUrl) {
   return `/uploads/${name}`;
 }
 
-// PATCH /api/me/photo  — the farmer's own profile picture.
+router.patch('/profile', auth, wrap(async (req, res) => {
+  const user = await loadUser(req.user.id);
+  if (!user) throw new HttpError(404, 'Account not found');
+  if (user.role === 'beneficiary') throw new HttpError(403, 'Your profile is managed by the Municipal Agriculture Office');
+
+  const body = req.body || {};
+  const first_name = String(body.first_name ?? '').trim();
+  const middle_name = String(body.middle_name ?? '').trim() || null;
+  const last_name = String(body.last_name ?? '').trim();
+  const email = String(body.email ?? '').trim().toLowerCase() || null;
+  const mobile_number = String(body.mobile_number ?? '').trim() || null;
+
+  if (!first_name) throw new HttpError(400, 'First name is required', { field: 'first_name' });
+  if (!last_name) throw new HttpError(400, 'Last name is required', { field: 'last_name' });
+  for (const [field, value] of Object.entries({ first_name, middle_name, last_name })) {
+    if (value && value.length > MAX_NAME_LENGTH) {
+      throw new HttpError(400, `Name parts must be ${MAX_NAME_LENGTH} characters or fewer`, { field });
+    }
+  }
+  if (email && !EMAIL_RE.test(email)) throw new HttpError(400, 'Enter a valid email address', { field: 'email' });
+  if (!mobile_number) throw new HttpError(400, 'Mobile number is required', { field: 'mobile_number' });
+  if (!MOBILE_RE.test(mobile_number)) {
+    throw new HttpError(400, 'Enter a valid Philippine mobile number (09XXXXXXXXX)', { field: 'mobile_number' });
+  }
+
+  const input = { first_name, middle_name, last_name, email, mobile_number };
+  const errors = await checkUserDuplicateFields(input, { excludeId: user.id });
+  if (errors.length) throw duplicateErrors(errors);
+
+  await pool.query(
+    'UPDATE users SET first_name = ?, middle_name = ?, last_name = ?, email = ?, mobile_number = ? WHERE id = ?',
+    [first_name, middle_name, last_name, email, mobile_number, user.id]
+  );
+
+  const [rows] = await pool.query(
+    'SELECT id, first_name, middle_name, last_name, email, mobile_number, role, is_active, profile_pic, created_at, last_active_at ' +
+    'FROM users WHERE id = ? LIMIT 1',
+    [user.id]
+  );
+  res.json({ ok: true, user: rows[0] || null });
+}));
+
 router.patch('/photo', auth, wrap(async (req, res) => {
   const ben = await beneficiaryForUser(req.user.id);
-  if (!ben) throw new HttpError(404, 'Beneficiary profile not found');
+  if (!ben && req.user.role === 'beneficiary') throw new HttpError(404, 'Beneficiary profile not found');
   const { dataUrl, remove } = req.body || {};
   if (remove || dataUrl === null) {
-    await pool.query('UPDATE beneficiaries SET profile_pic = NULL WHERE id = ?', [ben.id]);
+    if (ben) await pool.query('UPDATE beneficiaries SET profile_pic = NULL WHERE id = ?', [ben.id]);
+    else await pool.query('UPDATE users SET profile_pic = NULL WHERE id = ?', [req.user.id]);
     return res.json({ ok: true, profile_pic: null });
   }
   if (!dataUrl) throw new HttpError(400, 'Image data is required');
   const url = saveDataUrlImage(dataUrl);
-  await pool.query('UPDATE beneficiaries SET profile_pic = ? WHERE id = ?', [url, ben.id]);
+  if (ben) await pool.query('UPDATE beneficiaries SET profile_pic = ? WHERE id = ?', [url, ben.id]);
+  else await pool.query('UPDATE users SET profile_pic = ? WHERE id = ?', [url, req.user.id]);
   res.json({ ok: true, profile_pic: url });
 }));
 

@@ -83,6 +83,10 @@ async function attachAccount(req, res, next, { required }) {
 
   // The row is the source of truth for the role, not the token that carried it.
   req.user = { id: account.id, email: account.email, role: account.role };
+  pool.query(
+    "UPDATE users SET last_active_at = NOW() WHERE id = ? AND (last_active_at IS NULL OR last_active_at < NOW() - INTERVAL 5 MINUTE)",
+    [account.id]
+  ).catch(() => {});
   return next();
 }
 

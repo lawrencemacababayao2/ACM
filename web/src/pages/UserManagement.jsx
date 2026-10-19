@@ -36,7 +36,7 @@ const NEW_ACCOUNT = {
 
 const ROLE_OPTIONS = [
   { value: 'admin', label: 'Admin' },
-  { value: 'super_admin', label: 'Head' },
+  { value: 'super_admin', label: 'Superadmin' },
 ];
 
 const STATUS_TABS = [
@@ -47,9 +47,9 @@ const STATUS_TABS = [
 
 const ROLE_FILTERS = [{ key: 'role', matches: (r, v) => r.role === v }];
 
-// The seed super_admin signs in (and shows in the header) as "Head"; a plain
+// The seed super_admin signs in (and shows in the header) as "Superadmin"; a plain
 // portal staff member is "Admin". Matches the sidebar footer label.
-const roleLabel = (v) => (v === 'super_admin' ? 'Head' : 'Admin');
+const roleLabel = (v) => (v === 'super_admin' ? 'Superadmin' : 'Admin');
 
 function fmtDate(v) {
   if (!v) return '';
@@ -374,7 +374,7 @@ export default function UserManagement() {
           value={filters.values.role || ''}
           options={[
             { value: '', label: 'All roles' },
-            { value: 'super_admin', label: 'Head' },
+            { value: 'super_admin', label: 'Superadmin' },
             { value: 'admin', label: 'Admin' },
           ]}
           onChange={filters.setFilter('role')}

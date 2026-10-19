@@ -212,6 +212,7 @@ export default function Requests() {
   const [lastAction, setLastAction] = useState("approve");
   const [closeConfirm, setCloseConfirm] = useState(null);
   const [actionConfirm, setActionConfirm] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const user = api.user();
   const online = useOnlineStatus();
@@ -413,6 +414,36 @@ export default function Requests() {
     });
   };
 
+  const confirmDelete = (r) => {
+    setActionConfirm({
+      title: "Delete request",
+      message: `Delete request ${r.id} for "${
+        r.name || `${r.first_name} ${r.last_name}`
+      }"? This permanently removes the request, its status history and related notifications. This cannot be undone.`,
+      onConfirm: () => doDelete(r),
+      confirmLabel: "Delete",
+      danger: true,
+    });
+  };
+
+  const doDelete = async (r) => {
+    if (deleting) return;
+    setDeleting(true);
+    try {
+      await api.del(`/requests/${r.id}`);
+      toast("Request deleted", "ok");
+      if (selected?.id === r.id) {
+        draft.clear();
+        setSelected(null);
+      }
+      load();
+    } catch (err) {
+      toast(err.message, "err");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   // ── Filter options ──────────────────────────────────────────────────────
   const benTypeOptions = [
     { value: "", label: "All beneficiary types" },
@@ -606,17 +637,31 @@ export default function Requests() {
               key: "actions",
               label: "",
               render: (r) => (
-                <button
-                  className="btn sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openDetail(r);
-                  }}
-                >
-                  {["completed", "rejected"].includes(r.status)
-                    ? "View"
-                    : "Process"}
-                </button>
+                <div className="row-actions">
+                  <button
+                    className="btn sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openDetail(r);
+                    }}
+                  >
+                    {["completed", "rejected"].includes(r.status)
+                      ? "View"
+                      : "Process"}
+                  </button>
+                  {r.status === "rejected" && (
+                    <button
+                      className="btn sm danger"
+                      disabled={!online || deleting}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        confirmDelete(r);
+                      }}
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
               ),
             },
           ]}
@@ -682,6 +727,8 @@ export default function Requests() {
               online={online}
               onSubmit={submit}
               onDecide={confirmAction}
+              onDelete={confirmDelete}
+              deleting={deleting}
               onClose={requestClose}
               actionConfirm={actionConfirm}
               setActionConfirm={setActionConfirm}
@@ -726,6 +773,8 @@ function RequestPanel({
   online,
   onSubmit,
   onDecide,
+  onDelete,
+  deleting,
   onClose,
   actionConfirm,
   setActionConfirm,
@@ -746,6 +795,8 @@ function RequestPanel({
           save={save}
           online={online}
           onDecide={onDecide}
+          onDelete={() => onDelete(request)}
+          deleting={deleting}
           onClose={onClose}
         />
       ) : (
@@ -759,6 +810,8 @@ function RequestPanel({
           online={online}
           onSubmit={onSubmit}
           onDecide={onDecide}
+          onDelete={() => onDelete(request)}
+          deleting={deleting}
           onClose={onClose}
           nextActions={nextActions}
           isFinished={isFinished}
@@ -775,6 +828,8 @@ function CorrectionPanel({
   save,
   online,
   onDecide,
+  onDelete,
+  deleting,
   onClose,
 }) {
   const label =
@@ -846,18 +901,44 @@ function CorrectionPanel({
         </p>
       </div>
       {request.status !== "pending" ? (
-        <div
-          className="card"
-          style={{ background: "var(--bg)", marginBottom: 14 }}
-        >
-          <StatusBadge value={request.status} />
-          {request.decision_reason && (
-            <p className="muted" style={{ margin: "8px 0 0" }}>
-              {request.decision_reason}
-            </p>
+        <>
+          <div
+            className="card"
+            style={{ background: "var(--bg)", marginBottom: 14 }}
+          >
+            <StatusBadge value={request.status} />
+            {request.decision_reason && (
+              <p className="muted" style={{ margin: "8px 0 0" }}>
+                {request.decision_reason}
+              </p>
+            )}
+            <Timeline history={request.history} />
+          </div>
+          {request.status === "rejected" && (
+            <div
+              className="flex"
+              style={{
+                justifyContent: "flex-end",
+                gap: 8,
+                alignItems: "center",
+              }}
+            >
+              {!online && (
+                <span className="muted">Waiting for connection…</span>
+              )}
+              <button className="btn" onClick={onClose}>
+                Close
+              </button>
+              <button
+                className="btn danger"
+                disabled={save.busy || !online || deleting}
+                onClick={onDelete}
+              >
+                {deleting ? "Deleting…" : "Delete"}
+              </button>
+            </div>
           )}
-          <Timeline history={request.history} />
-        </div>
+        </>
       ) : (
         <>
           <Field label="Reason (required for rejection)">
@@ -927,6 +1008,8 @@ function ItemPanel({
   online,
   onSubmit,
   onDecide,
+  onDelete,
+  deleting,
   onClose,
   nextActions,
   isFinished,
@@ -1128,6 +1211,15 @@ function ItemPanel({
         <button className="btn" onClick={onClose}>
           Close
         </button>
+        {request.status === "rejected" && (
+          <button
+            className="btn danger"
+            disabled={save.busy || !online || deleting}
+            onClick={onDelete}
+          >
+            {deleting ? "Deleting…" : "Delete"}
+          </button>
+        )}
         {showForm && (
           <button
             className="btn primary"
