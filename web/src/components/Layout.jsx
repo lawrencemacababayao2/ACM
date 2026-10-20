@@ -5,7 +5,7 @@ import { useToast } from "../toast.jsx";
 import Icon from "./Icon.jsx";
 import BrandMotif from "./BrandMotif.jsx";
 import ConnectionBanner from "./ConnectionBanner.jsx";
-import { isReportsArea, reportCategoriesFor } from "../reportCategories.js";
+import { isReportsArea, reportCategoriesFor, activeReportCategory, REPORTS_LABEL } from "../reportCategories.js";
 
 const COLLAPSED_KEY = "acm_sidebar_collapsed";
 
@@ -115,6 +115,14 @@ export default function Layout() {
     if (category) return category.label;
     return isReportsArea(location.pathname) ? "Reports" : "Dashboard";
   })();
+
+  // Every page sits under Home. Report pages additionally show the Reports area
+  // as a middle crumb before the specific category, so the trail reads
+  // Home > Reports > Animal Health Monitoring rather than skipping the parent.
+  const reportCategory = activeReportCategory(location.pathname);
+  const crumbTrail = reportCategory
+    ? [REPORTS_LABEL, reportCategory.label]
+    : [crumbLabel];
 
   const reportsExpanded = reportsOpen ?? inReports;
 
@@ -435,10 +443,10 @@ export default function Layout() {
               </span>
               {user && (
                 <span
-                  className={`appbar-avatar-status ${user.is_active ? 'on' : 'off'}`}
+                  className={`appbar-avatar-status ${user.is_active ? "on" : "off"}`}
                   role="img"
-                  aria-label={user.is_active ? 'Active' : 'Inactive'}
-                  title={user.is_active ? 'Active' : 'Inactive'}
+                  aria-label={user.is_active ? "Active" : "Inactive"}
+                  title={user.is_active ? "Active" : "Inactive"}
                 />
               )}
             </span>
@@ -455,8 +463,20 @@ export default function Layout() {
               <Icon name="home" size={13} />
               <span>Home</span>
             </NavLink>
-            <span className="crumb-sep">›</span>
-            <span className="crumb-current">{crumbLabel}</span>
+            {crumbTrail.map((label, i) => (
+              <React.Fragment key={label}>
+                <span className="crumb-sep">›</span>
+                <span
+                  className={
+                    i === crumbTrail.length - 1
+                      ? "crumb-current"
+                      : "crumb-mid"
+                  }
+                >
+                  {label}
+                </span>
+              </React.Fragment>
+            ))}
           </div>
           <div className="crumb-stamp">
             <span>

@@ -55,6 +55,9 @@ export function activeReportCategory(pathname) {
   return REPORT_CATEGORIES.find((category) => category.route === `${REPORT_BASE}/${rest}`) || null;
 }
 
+/** Label of the Reports area itself, used as the middle crumb on report pages. */
+export const REPORTS_LABEL = 'Reports';
+
 /** True when the path is anywhere in the Reports area, used to expand the submenu. */
 export function isReportsArea(pathname) {
   return pathname === REPORT_BASE || Boolean(pathname?.startsWith(`${REPORT_BASE}/`));

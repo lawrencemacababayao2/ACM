@@ -295,7 +295,7 @@ export default function Requests() {
   const tabs = useMemo(() => {
     const baseTabs = [
       { value: "", label: "All" },
-      { value: "pending", label: "Pending", tone: "amber" },
+      { value: "pending", label: "Pending", sidebarCount: true },
       { value: "approved", label: "Approved", tone: "green" },
       { value: "scheduled", label: "Scheduled", tone: "green" },
       { value: "in_progress", label: "In progress", tone: "green" },
@@ -305,9 +305,7 @@ export default function Requests() {
 
     return baseTabs.map((t) => {
       const count = filters.counts[t.value] ?? 0;
-      const tone =
-        t.value === "pending" ? (count === 0 ? "green" : "amber") : t.tone;
-      return { ...t, count, tone };
+      return { ...t, count };
     });
   }, [filters.counts]);
 

@@ -167,11 +167,11 @@ export default function Dashboard() {
           subtitle="Overview of Municipal Agriculture Office activities"
         />
         <div className="dash-head-actions">
-          <button className="btn" onClick={() => navigate("/announcements")}>
+          <button className="btn" onClick={() => navigate("/announcements?new=1")}>
             <Icon name="plus" size={15} />
             New advisory
           </button>
-          <button className="btn primary" onClick={() => navigate("/programs")}>
+          <button className="btn primary" onClick={() => navigate("/programs?new=1")}>
             <Icon name="plus" size={15} />
             New program
           </button>
@@ -409,14 +409,14 @@ export default function Dashboard() {
                   <div className="dash-sched-empty-actions">
                     <button
                       className="btn sm primary"
-                      onClick={() => navigate("/programs")}
+                      onClick={() => navigate("/programs?new=1")}
                     >
                       <Icon name="plus" size={14} />
                       New program
                     </button>
                     <button
                       className="btn sm"
-                      onClick={() => navigate("/trainings")}
+                      onClick={() => navigate("/trainings?new=1")}
                     >
                       <Icon name="plus" size={14} />
                       New training & Seminar

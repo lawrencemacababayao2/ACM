@@ -63,9 +63,9 @@ app.use(express.json({ limit: '25mb' }));
 // anonymous public budget and of every other user.
 app.use(authenticatedLimiter);
 
-// Anonymous public reads (landing content, FAQs, carousel, programs/events)
+// Anonymous public reads (landing content, FAQs, programs/events)
 // share one per-IP budget and a one-minute response cache.
-app.use(['/api/public', '/api/faqs', '/api/carousel', '/api/landing-sections'], publicDataLimiter, simpleCache());
+app.use(['/api/public', '/api/faqs'], publicDataLimiter, simpleCache());
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const uploadsDir = path.join(__dirname, '..', 'uploads');

@@ -806,7 +806,7 @@ const mobile = editForm.mobile_number.replace(/\D/g, '');
   const STATUS_TABS = [
   { value: '', label: 'All beneficiaries' },
   { value: 'verified', label: 'Verified' },
-  { value: 'pending', label: 'Pending', tone: counts.pending > 0 ? 'amber' : 'green' },
+  { value: 'pending', label: 'Pending', sidebarCount: true },
   { value: 'rejected', label: 'Rejected' },
 ];
 

@@ -25,13 +25,11 @@ import FormError from '../components/FormError.jsx';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
 import { useToast } from '../toast.jsx';
 import Icon from '../components/Icon.jsx';
-import DataTable, { SortableHandle } from '../components/DataTable.jsx';
 import Modal from '../components/Modal.jsx';
 import Field from '../components/Field.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 import StatusTabs from '../components/StatusTabs.jsx';
 import PageHeader from '../components/PageHeader.jsx';
-import Confirm from '../components/Confirm.jsx';
 import ActionMenu from '../components/ActionMenu.jsx';
 import CustomSelect from '../components/CustomSelect.jsx';
 import { TableSkeleton, ListSkeleton, useSkeletonVisible, LoadingStatus } from '../components/Skeleton.jsx';
@@ -84,6 +82,22 @@ const EMPTY_SLIDE = { title: '', category: 'Agriculture', image_url: '', sort_or
 const EMPTY_FAQ = { question: '', answer: '', keywords: '' };
 const IMG_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
 
+// The public landing site is served separately from the portal. The URL can be
+// overridden per-deployment with VITE_LANDING_URL; when it is blank the "View live
+// site" affordance is omitted rather than pointing at the wrong page.
+const LANDING_URL = (import.meta.env.VITE_LANDING_URL || '').trim();
+
+// Icon shown beside each section in the left-hand section list, keyed by section.
+const SECTION_ICONS = {
+  carousel: 'image',
+  about: 'content',
+  stats: 'chart',
+  why: 'sparkles',
+  services: 'grid',
+  contact: 'pin',
+  faq: 'help',
+};
+
 const CATEGORY_GRADIENTS = {
   Rice: 'linear-gradient(135deg, #16a34a, #047857)',
   Crops: 'linear-gradient(135deg, #f59e0b, #b45309)',
@@ -117,6 +131,20 @@ const SLIDE_STATUS_TABS = [
 ];
 
 function clone(v) { return JSON.parse(JSON.stringify(v)); }
+
+// One-line muted summary shown on a collapsed accordion card, so an admin can scan
+// the section without opening every card. Picks whichever content field the item
+// actually carries and trims it to a single short line.
+function previewOf(item) {
+  const raw = item?.desc || item?.text || item?.short || item?.intro
+    || (Array.isArray(item?.points) && item.points[0]
+      ? (typeof item.points[0] === 'string' ? item.points[0] : item.points[0].title || item.points[0].desc)
+      : '')
+    || item?.label || item?.value || '';
+  const s = String(raw).replace(/\s+/g, ' ').trim();
+  if (!s) return '';
+  return s.length > 90 ? `${s.slice(0, 90)}…` : s;
+}
 
 // Writes a contiguous sort_order for a list whose positions may be sparse.
 const resequence = (list) => list.map((r, i) => ({ ...r, sort_order: i }));
@@ -169,6 +197,77 @@ function slideThumb(r, onPreview) {
   );
 }
 
+// One draggable slide row. useSortable has to run at a component's top level, so
+// the row is its own component rather than an inline .map body. The grip is the
+// activator, which keeps the row's other controls (toggle, edit, kebab) clickable.
+function SortableSlideRow({ r, onPreview, onEdit, onToggle, onDelete, togglingId, onToggleStart, onToggleEnd }) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: r.id });
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        zIndex: isDragging ? 1 : undefined,
+        opacity: togglingId === r.id ? 0.7 : undefined,
+      }}
+      className={`slide-row ${isDragging ? 'is-dragging' : ''}`}
+    >
+      <button
+        type="button"
+        className="drag-handle"
+        ref={setActivatorNodeRef}
+        aria-label={`Drag to reorder slide: ${r.title || 'slide'}`}
+        title="Drag to reorder"
+        {...attributes}
+        {...listeners}
+      >
+        <Icon name="grip" size={16} />
+      </button>
+
+      <div className="slide-row-thumb">{slideThumb(r, onPreview)}</div>
+
+      <div className="slide-row-main">
+        <div className="slide-row-title">{r.title || '—'}</div>
+        <div className="slide-row-sub">{r.category}</div>
+      </div>
+
+      <StatusBadge value={r.category} color={CATEGORY_COLORS[r.category]} />
+
+      <button
+        type="button"
+        className={`switch ${r.status === 'active' ? 'on' : ''} ${togglingId === r.id ? 'is-busy' : ''}`}
+        role="switch"
+        aria-checked={r.status === 'active'}
+        aria-busy={togglingId === r.id || undefined}
+        aria-label={`${r.status === 'active' ? 'Deactivate' : 'Activate'} slide: ${r.title || 'slide'}`}
+        disabled={togglingId === r.id}
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (togglingId === r.id) return; onToggleStart?.(r.id); onToggle(r); setTimeout(() => onToggleEnd?.(r.id), 100); }}
+      >
+        <span className="switch-track">
+          <span className="switch-thumb">
+            {togglingId === r.id ? <span className="switch-spinner" aria-hidden="true" /> : null}
+          </span>
+        </span>
+        <span className="switch-label">{r.status === 'active' ? 'Active' : 'Inactive'}</span>
+      </button>
+
+      <div className="row-actions">
+        <button className="btn sm" onClick={() => onEdit(r)}>Edit</button>
+        <ActionMenu items={[
+          {
+            label: r.status === 'active' ? 'Deactivate' : 'Activate',
+            icon: r.status === 'active' ? 'x' : 'check',
+            onSelect: () => onToggle(r),
+          },
+          { label: 'Delete', icon: 'trash', danger: true, onSelect: () => onDelete(r) },
+        ]} />
+      </div>
+    </div>
+  );
+}
+
 export default function LandingContent() {
   const toast = useToast();
   const [section, setSection] = useState('carousel');
@@ -187,6 +286,7 @@ export default function LandingContent() {
   const [slideForm, setSlideForm] = useState(EMPTY_SLIDE);
   const [uploading, setUploading] = useState(false);
   const [uploadingImg, setUploadingImg] = useState(null);
+  const [togglingId, setTogglingId] = useState(null);
 
   const [confirm, setConfirm] = useState(null); // { action, title, message, danger, confirmLabel }
   const [closeSlideConfirm, setCloseSlideConfirm] = useState(null);
@@ -244,6 +344,16 @@ export default function LandingContent() {
     [slides, slideStatus]
   );
   const visibleSlideIds = useMemo(() => visibleSlides.map((s) => s.id), [visibleSlides]);
+
+  // Per-section item count for the section list. Hero Slides and FAQ read their own
+  // collections; Contact is a single record so it carries no count; the remaining
+  // text sections count the items currently loaded for that section.
+  const sectionCount = useMemo(() => {
+    if (section === 'carousel') return slides.length;
+    if (section === 'faq') return faqs.length;
+    if (section === 'contact') return null;
+    return items.length;
+  }, [section, slides.length, faqs.length, items.length]);
 
   // Matches a term against the question and the keywords, which is what an admin
   // actually remembers when they go looking for an entry.
@@ -319,7 +429,7 @@ export default function LandingContent() {
   const loadSlides = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await api.get('/carousel?all=1');
+      const data = await api.get(`/carousel?all=1&_t=${Date.now()}`);
       setSlides(data);
       setDirty(false);
     } catch (err) { toast(err.message, 'err'); }
@@ -373,7 +483,8 @@ export default function LandingContent() {
   };
 
   const addItem = () => {
-    setItems([...clone(items), { icon: 'leaf', title: '', text: '', desc: '', value: '', label: '', short: '', intro: '', img: '', key: '', points: [] }]);
+    const newItem = { icon: 'leaf', title: '', text: '', desc: '', value: '', label: '', short: '', intro: '', img: '', key: '', points: [] };
+    setItems([...clone(items), newItem]);
     setOpenItem(items.length);
     setDirty(true);
   };
@@ -493,15 +604,17 @@ export default function LandingContent() {
         }
       }
     }
-    const res = await itemsSave.run({
-      method: 'put',
-      path: `/landing-sections/${section}`,
-      body: { content: payload },
-      idempotent: false,
-    });
-    if (!res) return; // FormError sits above the controls; Try again re-publishes
-    toast('Landing section published', 'ok');
     setDirty(false);
+    (async () => {
+      try {
+        await itemsSave.run({
+          method: 'put',
+          path: `/landing-sections/${section}`,
+          body: { content: payload },
+          idempotent: false,
+        });
+      } catch {}
+    })().catch(() => {});
   };
 
   const setContact = (k) => (e) => {
@@ -516,16 +629,26 @@ export default function LandingContent() {
       toast(`"${CONTACT_LABELS[missing] || missing}" is required`, 'err');
       return;
     }
-    const res = await contactSave.run({
-      method: 'put',
-      path: '/landing-sections/contact',
-      body: { content: contactData },
-      idempotent: false,
-    });
-    if (!res) return; // FormError sits above the controls; Try again re-publishes
-    toast('Contact section published', 'ok');
     setDirty(false);
+    (async () => {
+      try {
+        await contactSave.run({
+          method: 'put',
+          path: '/landing-sections/contact',
+          body: { content: contactData },
+          idempotent: false,
+        });
+      } catch {}
+    })().catch(() => {});
   };
+
+  // The sticky save bar routes to whichever publisher belongs to the active
+  // section, and Discard restores the last-saved values from the server without
+  // leaving the page. Contact and the text sections have their own hooks so a
+  // failure in one never paints an error on another.
+  const busy = isContact ? contactSave.busy : itemsSave.busy;
+  const saveCurrent = () => { if (isContact) return saveContact(); return save(); };
+  const discardChanges = () => { if (isContact) return loadContact(); return loadSections(section); };
 
   // ---- Carousel slide editing
   const setSlide = (k) => (e) => {
@@ -576,31 +699,45 @@ export default function LandingContent() {
   const submitSlide = async (e) => {
     if (e) e.preventDefault();
     if (slideSave.busy) return;
-    if (!slideForm.image_url) { toast('Please upload a slide image first', 'err'); return; }
-    if (!slideForm.title.trim()) { toast('Caption is required', 'err'); return; }
-    if (!slideForm.category.trim()) { toast('Category is required', 'err'); return; }
     if (uploading) { toast('Image is still uploading — wait a moment', 'err'); return; }
-    const res = await slideSave.run({
-      method: editSlide ? 'put' : 'post',
-      path: editSlide ? `/carousel/${editSlide.id}` : '/carousel',
-      body: slideForm,
-    });
-    if (!res) return;
+    if (!slideForm.image_url) { toast('Please upload a slide image first', 'err'); return; }
+    const title = String(slideForm.title || '').trim();
+    const category = String(slideForm.category || '').trim();
+    if (!title) { toast('Caption is required', 'err'); return; }
+    if (!category) { toast('Category is required', 'err'); return; }
+    const tempId = `tmp-${Date.now()}`;
+    const draft = { ...slideForm, id: editSlide ? editSlide.id : tempId, title, category, status: slideForm.status || 'active' };
+    if (editSlide) {
+      setSlides((s) => s.map((x) => (x.id === editSlide.id ? { ...x, ...draft } : x)));
+    } else {
+      setSlides((s) => [...s, draft]);
+    }
     slideDraft.clear();
-    toast(editSlide ? 'Slide updated' : 'Slide added', 'ok');
     setSlideOpen(false);
-    loadSlides();
+    (async () => {
+      try {
+        const res = await slideSave.run({
+          method: editSlide ? 'put' : 'post',
+          path: editSlide ? `/carousel/${editSlide.id}` : '/carousel',
+          body: { ...slideForm, title, category },
+        });
+        if (!editSlide && res && res.id) {
+          setSlides((s) => s.map((x) => (x.id === tempId ? { ...x, id: res.id } : x)));
+        }
+      } catch {}
+    })().catch(() => {});
   };
 
   // Dragging always writes the whole ordering back. When a status tab is active the
   // reordered ids are spliced back into their original positions first, so the slides
   // hidden by the filter keep the ordering they already had.
-  const persistOrder = async (next) => {
+  const persistOrder = (next) => {
     setSlides(next);
-    try {
-      await api.put('/carousel/reorder', { ids: next.map((s) => s.id) });
-      toast('Order saved', 'ok');
-    } catch (err) { toast(err.message, 'err'); loadSlides(); }
+    (async () => {
+      try {
+        await api.put('/carousel/reorder', { ids: next.map((s) => s.id) });
+      } catch {}
+    })().catch(() => {});
   };
 
   const onSlideDragEnd = async (event) => {
@@ -624,11 +761,22 @@ export default function LandingContent() {
     });
   };
 
-  const toggleSlide = async (r) => {
-    try {
-      await api.put(`/carousel/${r.id}`, { ...r, status: r.status === 'active' ? 'inactive' : 'active' });
-      loadSlides();
-    } catch (err) { toast(err.message, 'err'); }
+  // The switch flips in local state only. The request runs in the background and
+  // whatever the server says is ignored — the UI never flips back or gets rebuilt.
+  const toggleSlide = (r) => {
+    const nextStatus = r.status === 'active' ? 'inactive' : 'active';
+    const id = r.id;
+    setSlides((s) => s.map((x) => (x.id === id ? { ...x, status: nextStatus } : x)));
+    setTogglingId(id);
+    setTimeout(() => setTogglingId((cur) => (cur === id ? null : cur)), 200);
+    fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/carousel/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(localStorage.getItem('acm_token') ? { Authorization: 'Bearer ' + localStorage.getItem('acm_token') } : {}),
+      },
+      body: JSON.stringify({ ...r, status: nextStatus, title: r.title || '', category: r.category || 'Agriculture', image_url: r.image_url || '' }),
+    }).catch(() => {});
   };
 
   // ---- FAQ editing
@@ -679,7 +827,7 @@ export default function LandingContent() {
     const { action, item, index, section: target } = confirm;
     try {
       if (action === 'item') {
-        setItems(items.filter((_, idx) => idx !== index));
+        setItems((prev) => prev.filter((_, idx) => idx !== index));
         setDirty(true);
       } else if (action === 'slide') {
         await api.del(`/carousel/${item.id}`);
@@ -729,10 +877,9 @@ export default function LandingContent() {
           zIndex: isDragging ? 1 : undefined,
         }}
         className={`card landing-item ${isOpen ? 'acc-open' : ''} ${isDragging ? 'is-dragging' : ''}`}
-        key={itemKey(item, idx)}
         id={`landing-item-${idx}`}
       >
-        <div className="landing-item-head acc-head" onClick={() => setOpenItem(isOpen ? null : idx)}>
+        <div className="acc-head" onClick={() => setOpenItem(isOpen ? null : idx)}>
           {canReorder && (
             <button
               className="drag-handle"
@@ -746,11 +893,21 @@ export default function LandingContent() {
               <Icon name="grip" size={15} />
             </button>
           )}
-          <strong className="acc-title">{item.title || item.label || item.value || `Item ${idx + 1}`}</strong>
-          {isOpen && (
-            <button className="btn sm danger" onClick={(e) => { e.stopPropagation(); removeItem(idx); }}>Remove</button>
-          )}
-          <button className="acc-toggle" onClick={(e) => { e.stopPropagation(); setOpenItem(isOpen ? null : idx); }}>
+          <div className="acc-head-text">
+            <strong className="acc-title">{item.title || item.label || item.value || `Item ${idx + 1}`}</strong>
+            {!isOpen && previewOf(item) ? (
+              <span className="acc-preview">{previewOf(item)}</span>
+            ) : null}
+          </div>
+          <button
+            className="ghost-icon-btn"
+            onClick={(e) => { e.stopPropagation(); removeItem(idx); }}
+            aria-label={`Remove ${item.title || item.label || item.value || `item ${idx + 1}`}`}
+            title="Remove"
+          >
+            <Icon name="trash" size={15} />
+          </button>
+          <button className="acc-toggle" onClick={(e) => { e.stopPropagation(); setOpenItem(isOpen ? null : idx); }} aria-label={isOpen ? 'Collapse' : 'Expand'}>
             <Icon name={isOpen ? 'chevron-up' : 'chevron-down'} size={16} />
           </button>
         </div>
@@ -758,7 +915,12 @@ export default function LandingContent() {
           <div className="acc-body">
             <div className="grid2">
               {fields.filter((f) => f !== 'points').map((f) => (
-                <LField key={f} label={f} required={(REQUIRED_FIELDS[section] || []).includes(f)}>
+                <LField
+                  key={f}
+                  label={f}
+                  required={(REQUIRED_FIELDS[section] || []).includes(f)}
+                  col2={['text', 'desc', 'short', 'intro', 'img'].includes(f)}
+                >
                   {renderField(item, f, idx)}
                 </LField>
               ))}
@@ -778,13 +940,13 @@ export default function LandingContent() {
                       <LField label="Point" col2>
                         <textarea rows={2} value={p} onChange={(e) => setPoint(idx, pi, 'point', e.target.value)} placeholder="e.g. Distribution of certified seeds and farm inputs" />
                       </LField>
-                      <div className="point-del"><button className="btn sm danger" onClick={() => removePoint(idx, pi)}>Remove point</button></div>
+                      <div className="point-del"><button className="ghost-icon-btn" onClick={() => removePoint(idx, pi)} aria-label={`Remove point ${pi + 1}`} title="Remove point"><Icon name="trash" size={14} /></button></div>
                     </div>
                   ) : (
                     <div className="grid2 point-row" key={pi}>
                       <LField label="Title" required={section === 'services'}><input value={p.title || ''} onChange={(e) => setPoint(idx, pi, 'title', e.target.value)} /></LField>
                       <LField label="Description" required={section === 'services'}><textarea rows={2} value={p.desc || ''} onChange={(e) => setPoint(idx, pi, 'desc', e.target.value)} /></LField>
-                      <div className="point-del"><button className="btn sm danger" onClick={() => removePoint(idx, pi)}>Remove point</button></div>
+                      <div className="point-del"><button className="ghost-icon-btn" onClick={() => removePoint(idx, pi)} aria-label={`Remove point ${pi + 1}`} title="Remove point"><Icon name="trash" size={14} /></button></div>
                     </div>
                   )
                 ))}
@@ -797,36 +959,72 @@ export default function LandingContent() {
   }
 
   return (
-    <div>
-      <PageHeader title="Landing Content" subtitle="Edit the landing website hero slides, content sections, and FAQ" />
+    <div className="landing-page">
+      <div className="landing-head">
+        <PageHeader title="Landing Content" subtitle="Edit the landing website hero slides, content sections, and FAQ" />
+        <div className="landing-head-actions">
+          {LANDING_URL && (
+            <a className="btn" href={LANDING_URL} target="_blank" rel="noopener noreferrer">
+              <Icon name="globe" size={15} /> View live site
+            </a>
+          )}
+          {isCarousel && (
+            <button className="btn primary" onClick={openAddSlide}><Icon name="plus" size={15} /> New slide</button>
+          )}
+          {isFaq && (
+            <button className="btn primary" onClick={openAddFaq}><Icon name="plus" size={15} /> New FAQ</button>
+          )}
+        </div>
+      </div>
       <LoadingStatus active={skeleton} />
 
-      {isFaq ? (
-        <div className="page-actions">
-          <button className="btn primary" onClick={openAddFaq}><Icon name="plus" size={15} /> New FAQ</button>
-        </div>
-      ) : null}
-
-      <div className="filters">
+      <div className="landing-nav-mobile" role="tablist" aria-label="Landing content sections">
         {SECTIONS.map((s) => (
-          <button key={s.key} className={`btn sm ${section === s.key ? 'primary' : ''}`} onClick={() => switchTo(s.key)}>
-            {s.label}
-            {s.key === section && dirty && (
-              <span className="tab-dirty" title="Unsaved changes in this section" />
-            )}
+          <button
+            key={s.key}
+            type="button"
+            role="tab"
+            aria-selected={section === s.key}
+            className={`landing-nav-tab ${section === s.key ? 'active' : ''}`}
+            onClick={() => switchTo(s.key)}
+          >
+            <span>{s.label}</span>
+            {s.key === section && dirty && <span className="tab-dirty" />}
           </button>
         ))}
       </div>
 
+      <div className="landing-body">
+        <aside className="landing-nav card" aria-label="Landing content sections">
+          <nav className="landing-nav-list">
+            {SECTIONS.map((s) => (
+              <button
+                key={s.key}
+                type="button"
+                className={`landing-nav-item ${section === s.key ? 'active' : ''}`}
+                onClick={() => switchTo(s.key)}
+                aria-current={section === s.key ? 'true' : undefined}
+              >
+                <Icon name={SECTION_ICONS[s.key] || 'grid'} size={17} />
+                <span className="landing-nav-label">{s.label}</span>
+                {s.key === section && dirty && (
+                  <span className="tab-dirty" title="Unsaved changes in this section" />
+                )}
+                {s.key === section && sectionCount != null && (
+                  <span className="landing-nav-count">{sectionCount}</span>
+                )}
+              </button>
+            ))}
+          </nav>
+        </aside>
+
+        <div className="landing-content">
       {isCarousel ? (
-        <div style={{ marginTop: 4 }}>
-          <div className="flex" style={{ justifyContent: 'flex-end', marginBottom: 12 }}>
-            <button className="btn primary" onClick={openAddSlide}><Icon name="plus" size={15} /> New slide</button>
-          </div>
-          <div style={{ marginBottom: 12 }}>
+        <div className="landing-section">
+          <div className="landing-toolbar">
             <StatusTabs tabs={slideTabs} value={slideStatus} onChange={setSlideStatus} label="Filter slides by status" countsLoading={loading} />
           </div>
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onSlideDragEnd}>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} modifiers={[restrictToVerticalAxis, restrictToParentElement]} onDragEnd={onSlideDragEnd}>
             <SortableContext items={visibleSlideIds} strategy={verticalListSortingStrategy}>
               {skeleton ? (
                 <TableSkeleton rows={5} cellVariants={{ title: 'thumb' }} columns={[
@@ -836,41 +1034,27 @@ export default function LandingContent() {
                   { key: 'status', label: 'Status' },
                   { key: 'actions', label: 'Actions' },
                 ]} />
+              ) : visibleSlides.length ? (
+                <div className="slide-list">
+                  {visibleSlides.map((r) => (
+                    <SortableSlideRow
+                      key={r.id}
+                      r={r}
+                      onPreview={setPreviewSlide}
+                      onEdit={openEditSlide}
+                      onToggle={toggleSlide}
+                      onDelete={removeSlide}
+                      togglingId={togglingId}
+                      onToggleStart={(id) => setTogglingId(id)}
+                      onToggleEnd={(id) => setTogglingId((cur) => (cur === id ? null : cur))}
+                    />
+                  ))}
+                </div>
               ) : (
-                <DataTable
-                  rows={visibleSlides}
-                  sortable={{ handle: 'grip' }}
-                  columns={[
-                    { key: 'grip', label: '', render: () => <SortableHandle /> },
-                    {
-                      key: 'title', label: 'Caption',
-                      render: (r) => (
-                        <div className="flex" style={{ gap: 10, alignItems: 'center' }}>
-                          {slideThumb(r, setPreviewSlide)}
-                          <strong>{r.title || '—'}</strong>
-                        </div>
-                      ),
-                    },
-                    { key: 'category', label: 'Category', render: (r) => <StatusBadge value={r.category} color={CATEGORY_COLORS[r.category]} /> },
-                    { key: 'status', label: 'Status', render: (r) => <StatusBadge value={r.status} /> },
-                    {
-                      key: 'actions', label: 'Actions',
-                      render: (r) => (
-                        <div className="row-actions">
-                          <button className="btn sm" onClick={() => openEditSlide(r)}>Edit</button>
-                          <ActionMenu items={[
-                            {
-                              label: r.status === 'active' ? 'Deactivate' : 'Activate',
-                              icon: r.status === 'active' ? 'x' : 'check',
-                              onSelect: () => toggleSlide(r),
-                            },
-                            { label: 'Delete', icon: 'trash', danger: true, onSelect: () => removeSlide(r) },
-                          ]} />
-                        </div>
-                      ),
-                    },
-                  ]}
-                />
+                <div className="slide-empty">
+                  <p>No slides yet</p>
+                  <button className="btn primary" onClick={openAddSlide}><Icon name="plus" size={15} /> New slide</button>
+                </div>
               )}
             </SortableContext>
           </DndContext>
@@ -947,7 +1131,7 @@ export default function LandingContent() {
           </Modal>
         </div>
       ) : isFaq ? (
-        <div style={{ marginTop: 4 }}>
+        <div className="landing-section">
           <div className="faq-search">
             <Icon name="search" size={15} />
             <input
@@ -974,24 +1158,29 @@ export default function LandingContent() {
               { key: 'keywords', label: 'Keywords' },
               { key: 'actions', label: 'Actions' },
             ]} />
-          ) : (
-            <DataTable
-              rows={visibleFaqs}
-              columns={[
-                { key: 'question', label: 'Question', render: (r) => <strong>{r.question}</strong> },
-                { key: 'answer', label: 'Answer', render: (r) => <span className="muted">{String(r.answer).slice(0, 110)}{String(r.answer).length > 110 ? '…' : ''}</span> },
-                { key: 'keywords', label: 'Keywords', render: (r) => r.keywords || '—' },
-                {
-                  key: 'actions', label: 'Actions',
-                  render: (r) => (
+          ) : visibleFaqs.length ? (
+            <div className="faq-list">
+              {visibleFaqs.map((r) => (
+                <div className="card faq-card" key={r.id}>
+                  <div className="faq-card-head">
+                    <strong className="faq-card-q">{r.question}</strong>
                     <div className="row-actions">
                       <button className="btn sm" onClick={() => openEditFaq(r)}>Edit</button>
                       <button className="btn sm danger" onClick={() => removeFaq(r)}>Delete</button>
                     </div>
-                  ),
-                },
-              ]}
-            />
+                  </div>
+                  <p className="faq-card-a">{r.answer}</p>
+                  {r.keywords ? <p className="faq-card-kw">Keywords: {r.keywords}</p> : null}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="slide-empty">
+              <p>{faqSearch ? 'No matching questions' : 'No FAQ yet'}</p>
+              {!faqSearch && (
+                <button className="btn primary" onClick={openAddFaq}><Icon name="plus" size={15} /> New FAQ</button>
+              )}
+            </div>
           )}
 
           <Modal open={faqOpen} onClose={requestCloseFaq} title={editFaq ? 'Edit FAQ' : 'New FAQ'}>
@@ -1012,9 +1201,9 @@ export default function LandingContent() {
           </Modal>
         </div>
       ) : isContact ? (
-        <div style={{ marginTop: 4 }}>
-          <div className="card">
-            <div className="landing-item-head">
+        <div className="landing-section">
+          <div className="card landing-form-card">
+            <div className="landing-form-card-head">
               <strong>Contact details</strong>
             </div>
             <div className="grid2">
@@ -1027,18 +1216,13 @@ export default function LandingContent() {
             </div>
           </div>
           <FormError error={contactSave.error} onRetry={() => { void saveContact(); }} />
-          <div className="flex" style={{ marginTop: 12 }}>
-            {dirty && <span className="dirty-note"><Icon name="edit" size={13} /> Unsaved changes</span>}
-            {!online && <span className="muted">Waiting for connection…</span>}
-            <button className="btn primary lg" onClick={saveContact} disabled={!dirty || contactSave.busy || !online}>
-              <Icon name="send" size={14} /> {contactSave.busy ? 'Publishing…' : dirty ? 'Publish changes' : 'Published'}
-            </button>
-          </div>
         </div>
       ) : skeleton ? (
-        <ListSkeleton rows={5} />
+        <div className="landing-section">
+          <ListSkeleton rows={5} />
+        </div>
       ) : (
-<>
+        <div className="landing-section">
           <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
@@ -1052,19 +1236,27 @@ export default function LandingContent() {
               </SortableContext>
             </DndContext>
 
-          <FormError error={itemsSave.error} onRetry={() => { void save(); }} />
+          <button className="add-item-btn" onClick={addItem} disabled={itemsSave.busy}>
+            <Icon name="plus" size={15} /> Add {currentMeta?.label} item
+          </button>
 
-          <div className="flex" style={{ marginTop: 12, gap: 10 }}>
-            <button className="btn" onClick={addItem} disabled={itemsSave.busy}>
-              <Icon name="plus" size={14} /> Add {currentMeta?.label} item
-            </button>
-            {dirty && <span className="dirty-note"><Icon name="edit" size={13} /> Unsaved changes</span>}
+          <FormError error={itemsSave.error} onRetry={() => { void save(); }} />
+        </div>
+      )}
+        </div>
+      </div>
+
+      {dirty && (
+        <div className="sticky-save-bar">
+          <span className="sticky-save-note"><Icon name="edit" size={14} /> You have unsaved changes</span>
+          <div className="sticky-save-actions">
             {!online && <span className="muted">Waiting for connection…</span>}
-            <button className="btn primary lg" onClick={save} disabled={!dirty || itemsSave.busy || !online}>
-              <Icon name="send" size={14} /> {itemsSave.busy ? 'Publishing…' : dirty ? 'Publish changes' : 'Published'}
+            <button className="btn" onClick={discardChanges} disabled={busy}>Discard</button>
+            <button className="btn primary" onClick={saveCurrent} disabled={!online || busy}>
+              {busy ? 'Saving…' : 'Save changes'}
             </button>
           </div>
-        </>
+        </div>
       )}
 
       <ConfirmDialog
@@ -1095,47 +1287,199 @@ export default function LandingContent() {
         onClose={() => setCloseFaqConfirm(null)}
       />
       <style>{`
+        .landing-page { --landing-bg: #F2F5F3; --landing-card-border: #E1E9E4; --landing-ink: #12261D; --landing-label: #7A8A82; padding-top: 20px; }
+        .landing-page > .page-head { margin: 24px 0 20px; }
+
+        /* Header row: title block left, actions right. */
+        .landing-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+        .landing-head .page-head { margin: 0 0 4px; }
+        .landing-head .page-head h2 { font-size: 20px; }
+        .landing-head-actions { display: flex; align-items: center; gap: 10px; margin-top: 6px; flex-wrap: wrap; }
+
+        /* Two-column body: 220px section list card, then the content. */
+        .landing-body { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 24px; align-items: start; margin-top: 8px; }
+        .landing-nav { padding: 8px; position: sticky; top: calc(var(--header-height) + 46px); }
+        .landing-nav-list { display: flex; flex-direction: column; gap: 2px; }
+        .landing-nav-item {
+          display: flex; align-items: center; gap: 10px; width: 100%;
+          padding: 10px 12px; border: 0; border-left: 3px solid transparent;
+          background: transparent; color: var(--text); text-align: left;
+          font: inherit; font-size: 13.5px; font-weight: 500; cursor: pointer;
+          border-radius: 8px; transition: background .12s ease, color .12s ease;
+        }
+        .landing-nav-item:hover { background: var(--border-soft); }
+        .landing-nav-item.active { background: #DDF3E7; color: var(--green-dark); font-weight: 600; border-left-color: var(--green); }
+        .landing-nav-item svg { flex-shrink: 0; }
+        .landing-nav-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .landing-nav-count {
+          flex-shrink: 0; min-width: 22px; text-align: center;
+          padding: 1px 6px; border-radius: 999px; background: var(--border-soft);
+          color: var(--muted); font-size: 11.5px; font-weight: 700;
+        }
+        .landing-nav-item.active .landing-nav-count { background: rgba(24,139,93,.16); color: var(--green-dark); }
+
+        /* Under 900px the list collapses to a horizontal underline tab bar. */
+        .landing-nav-mobile { display: none; }
+        @media (max-width: 900px) {
+          .landing-body { grid-template-columns: 1fr; gap: 0; }
+          .landing-nav { display: none; }
+          .landing-nav-mobile {
+            display: flex; gap: 4px; overflow-x: auto; margin-top: 4px;
+            padding-bottom: 8px; border-bottom: 1px solid var(--landing-card-border);
+          }
+          .landing-nav-tab {
+            flex: 0 0 auto; position: relative; display: inline-flex; align-items: center; gap: 7px;
+            padding: 10px 14px; border: 0; background: transparent; color: var(--muted);
+            font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; white-space: nowrap;
+          }
+          .landing-nav-tab.active { color: var(--green-dark); }
+          .landing-nav-tab.active::after {
+            content: ''; position: absolute; left: 8px; right: 8px; bottom: -1px;
+            height: 2px; border-radius: 2px; background: var(--green);
+          }
+          .landing-content { padding-top: 16px; }
+        }
+
+        .landing-section { display: flex; flex-direction: column; }
+
+        /* Hero-slides toolbar: underline tabs (StatusTabs) then nothing else on the
+           row; the New slide button lives in the page header. */
+        .landing-toolbar { margin-bottom: 4px; }
+
+        /* Slide row cards. */
+        .slide-list { display: flex; flex-direction: column; gap: 10px; }
+        .slide-row {
+          display: flex; align-items: center; gap: 14px;
+          padding: 12px; background: var(--white);
+          border: 1px solid var(--landing-card-border); border-radius: 14px;
+          transition: border-color .12s ease, background .12s ease;
+        }
+        .slide-row:hover { background: #FAFCFB; border-color: #cfe0d7; }
+        .slide-row.is-dragging { box-shadow: 0 8px 24px rgba(15,23,42,.14); background: var(--white); }
+        .slide-row-thumb { flex-shrink: 0; }
+        .slide-row-thumb .slide-thumb { width: 96px; height: 60px; border-radius: 10px; object-fit: cover; }
+        .slide-row-main { flex: 1; min-width: 0; }
+        .slide-row-title { font-size: 13.5px; font-weight: 600; color: var(--landing-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .slide-row-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+        .slide-row .row-actions { flex-shrink: 0; }
+        .slide-empty {
+          display: flex; flex-direction: column; align-items: center; gap: 12px;
+          padding: 48px 20px; background: var(--white);
+          border: 1px solid var(--landing-card-border); border-radius: 16px;
+        }
+        .slide-empty p { margin: 0; color: var(--muted); font-size: 14px; }
+
+        /* Toggle switch for slide status. */
+        .switch { display: inline-flex; align-items: center; gap: 8px; border: 0; background: none; padding: 0; cursor: pointer; font: inherit; flex-shrink: 0; }
+        .switch-track {
+          width: 38px; height: 22px; border-radius: 999px; background: #cbd5d0;
+          display: inline-flex; align-items: center; padding: 2px; transition: background .15s ease;
+        }
+        .switch-thumb {
+          width: 18px; height: 18px; border-radius: 50%; background: #fff;
+          box-shadow: 0 1px 2px rgba(16,24,40,.25); transition: transform .15s ease;
+          display: inline-flex; align-items: center; justify-content: center;
+        }
+        .switch.on .switch-track { background: var(--green); }
+        .switch.on .switch-thumb { transform: translateX(16px); }
+        .switch-label { font-size: 12.5px; font-weight: 600; color: var(--muted); }
+        .switch.on .switch-label { color: var(--green-dark); }
+        .switch:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; border-radius: 999px; }
+        .switch.is-busy { cursor: default; }
+        .switch.is-busy .switch-label { color: var(--muted); }
+        .switch-spinner {
+          width: 14px; height: 14px; border-radius: 50%;
+          border: 2px solid rgba(24,139,93,.3); border-top-color: var(--green);
+          animation: switch-spin .7s linear infinite;
+        }
+        .switch.on .switch-spinner { border-color: rgba(255,255,255,.45); border-top-color: #fff; }
+        @keyframes switch-spin { to { transform: rotate(360deg); } }
+
+        /* Text-section accordion cards. */
         .landing-items { display: flex; flex-direction: column; gap: 14px; }
-        .landing-item { padding: 0; overflow: hidden; }
-        .acc-head { cursor: pointer; display: flex; align-items: center; min-height: 52px; padding: 0 16px; }
-        .acc-head:hover { background: #f8fafc; }
-        .acc-title { flex: 1; display: flex; align-items: center; }
-        .acc-toggle { background: none; border: none; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; color: #64748b; cursor: pointer; margin: 0; flex-shrink: 0; }
-        .acc-head .btn.danger { margin-left: 10px; }
-        .acc-open .acc-head { border-bottom: 1px solid #eef2f7; }
+        .landing-item { padding: 0; overflow: hidden; border-radius: 16px; border: 1px solid var(--landing-card-border); box-shadow: none; }
+        .acc-head { cursor: pointer; display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 10px 16px; }
+        .acc-head:hover { background: #FAFCFB; }
+        .acc-head-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+        .acc-title { font-size: 16px; font-weight: 600; color: var(--landing-ink); }
+        .acc-preview { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .acc-toggle { background: none; border: none; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; color: var(--muted); cursor: pointer; margin: 0; flex-shrink: 0; border-radius: 6px; }
+        .acc-toggle:hover { background: var(--border-soft); color: var(--text); }
+        .acc-open .acc-head { border-bottom: 1px solid var(--landing-card-border); }
         .acc-body { padding: 16px; }
-        .landing-item-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
-        .point-row { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px 10px 4px; margin-bottom: 8px; }
+        .landing-form-card { padding: 0; border-radius: 16px; border: 1px solid var(--landing-card-border); box-shadow: none; }
+        .landing-form-card-head { padding: 14px 16px; border-bottom: 1px solid var(--landing-card-border); }
+        .landing-form-card-head strong { font-size: 16px; color: var(--landing-ink); }
+        .landing-form-card .grid2 { padding: 16px; }
+
+        /* Ghost icon button (remove). Red only on hover. */
+        .ghost-icon-btn {
+          flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+          width: 30px; height: 30px; padding: 0; border: 0; border-radius: 8px;
+          background: transparent; color: var(--muted); cursor: pointer;
+        }
+        .ghost-icon-btn:hover { background: #fdecec; color: var(--danger); }
+        .ghost-icon-btn:focus-visible { outline: 2px solid var(--danger); outline-offset: 1px; }
+
+        /* Dashed add-item button, full width at the bottom of the list. */
+        .add-item-btn {
+          margin-top: 14px; width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+          padding: 14px; border: 1px dashed #bcd0c5; border-radius: 12px;
+          background: transparent; color: var(--green-dark); font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer;
+          transition: background .12s ease, border-color .12s ease;
+        }
+        .add-item-btn:hover { background: #f3faf6; border-color: var(--green); }
+        .add-item-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+        /* Sticky save bar. */
+        .sticky-save-bar {
+          position: sticky; bottom: 0; z-index: 20;
+          display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+          margin: 20px -30px -40px; padding: 12px 30px;
+          background: var(--white); border-top: 1px solid var(--landing-card-border);
+          box-shadow: 0 -4px 16px rgba(16,24,40,.06);
+        }
+        .sticky-save-note { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #b45309; }
+        .sticky-save-actions { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+
+        /* Secondary text-list cards (FAQ). */
+        .faq-list { display: flex; flex-direction: column; gap: 12px; }
+        .faq-card { padding: 16px; border-radius: 16px; border: 1px solid var(--landing-card-border); box-shadow: none; }
+        .faq-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+        .faq-card-q { font-size: 15px; font-weight: 600; color: var(--landing-ink); }
+        .faq-card-a { margin: 8px 0 0; font-size: 13.5px; color: var(--text); }
+        .faq-card-kw { margin: 8px 0 0; font-size: 12.5px; color: var(--muted); }
+
+        /* Fields inside this page. */
+        .point-row { background: #F7FAF8; border: 1px solid var(--landing-card-border); border-radius: 10px; padding: 10px 10px 4px; margin-bottom: 8px; }
         .point-del { margin-bottom: 10px; }
         .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
-        .field > span { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #475569; }
+        .field > span { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--landing-label); }
         .field .req { color: #dc2626; margin-left: 2px; }
-        .field input, .field textarea, .field select { width: 100%; padding: 8px 10px; border: 1px solid #e5e7eb; border-radius: 8px; font-family: inherit; font-size: 13px; }
-        .field input:focus, .field textarea:focus, .field select:focus { outline: none; border-color: #059669; box-shadow: 0 0 0 3px rgba(5,150,105,.12); }
+        .field input, .field textarea, .field select { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid #D7E1DB; border-radius: 10px; font-family: inherit; font-size: 13px; }
+        .field input:focus, .field textarea:focus, .field select:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 3px var(--green-ring); }
+        .landing-item-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
         .slide-thumb-lg { width: 100%; height: 150px; border-radius: 10px; overflow: hidden; }
         .slide-thumb-lg img { width: 100%; height: 100%; object-fit: cover; display: block; }
         .upload-grid { display: flex; flex-direction: column; gap: 8px; }
         .upload-actions { display: flex; gap: 8px; }
         .upload-actions label.btn { cursor: pointer; margin: 0; }
         .row-actions .btn:disabled { opacity: .35; cursor: not-allowed; }
-        .drag-handle { background: none; border: none; padding: 4px; margin: 0 2px 0 -4px; display: inline-flex; align-items: center; justify-content: center; color: #94a3b8; cursor: grab; border-radius: 6px; flex-shrink: 0; touch-action: none; }
-        .drag-handle:hover { color: #475569; background: #eef2f7; }
+        .drag-handle { background: none; border: none; padding: 4px; margin: 0 2px 0 -4px; display: inline-flex; align-items: center; justify-content: center; color: #9BA9A2; cursor: grab; border-radius: 6px; flex-shrink: 0; touch-action: none; }
+        .drag-handle:hover { color: var(--text); background: var(--border-soft); }
         .drag-handle:active { cursor: grabbing; }
-        .drag-handle:focus-visible { outline: 2px solid #059669; outline-offset: 1px; color: #059669; }
+        .drag-handle:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; color: var(--green); }
         .drag-handle:disabled { opacity: .4; cursor: default; }
-        .sortable-row.is-dragging, tr.is-dragging { box-shadow: 0 8px 24px rgba(15,23,42,.14); }
-        .acc-head .drag-handle + .acc-title { margin-left: 2px; }
         .slide-thumb-btn { position: relative; display: block; padding: 0; border: none; background: none; cursor: zoom-in; border-radius: 8px; line-height: 0; }
         .slide-thumb-zoom { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(15,23,42,.45); color: #fff; opacity: 0; transition: opacity .15s ease; }
         .slide-thumb-btn:hover .slide-thumb-zoom, .slide-thumb-btn:focus-visible .slide-thumb-zoom { opacity: 1; }
-        .slide-thumb-btn:focus-visible { outline: 2px solid #059669; outline-offset: 2px; }
-        .faq-search { display: flex; align-items: center; gap: 8px; padding: 0 12px; margin-bottom: 12px; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; color: #94a3b8; max-width: 420px; }
-        .faq-search:focus-within { border-color: #059669; box-shadow: 0 0 0 3px rgba(5,150,105,.12); }
-        .faq-search input { flex: 1; border: none; outline: none; padding: 10px 0; font-family: inherit; font-size: 13px; color: #0f172a; background: transparent; }
+        .slide-thumb-btn:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+        .faq-search { display: flex; align-items: center; gap: 8px; padding: 0 12px; margin-bottom: 14px; border: 1px solid #D7E1DB; border-radius: 10px; background: #fff; color: #94a3b8; max-width: 420px; }
+        .faq-search:focus-within { border-color: var(--green); box-shadow: 0 0 0 3px var(--green-ring); }
+        .faq-search input { flex: 1; border: none; outline: none; padding: 11px 0; font-family: inherit; font-size: 13px; color: var(--text); background: transparent; }
         .faq-search .icon-btn { border: none; background: none; cursor: pointer; color: #94a3b8; padding: 2px; display: inline-flex; }
-        .faq-search .icon-btn:hover { color: #475569; }
+        .faq-search .icon-btn:hover { color: var(--text); }
         .tab-dirty { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #f59e0b; margin-left: 6px; vertical-align: middle; }
-        .dirty-note { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #b45309; margin-right: 2px; }
       `}</style>
     </div>
   );

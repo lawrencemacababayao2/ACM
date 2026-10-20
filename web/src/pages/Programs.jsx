@@ -42,7 +42,7 @@ import { SelectControl } from '../reportTypes.jsx';
 // table reflects where each program actually is in time.
 const STATUS_TABS = [
   { value: '', label: 'All' },
-  { value: 'upcoming', label: 'Upcoming' },
+  { value: 'upcoming', label: 'Upcoming', sidebarCount: true },
   { value: 'ongoing', label: 'Ongoing' },
   { value: 'completed', label: 'Completed' },
   { value: 'cancelled', label: 'Cancelled' },
@@ -136,7 +136,7 @@ const load = useCallback(async () => {
     [all, now]
   );
 
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const filters = useRecordFilters(phasing, {
     statusField: 'phase',
     searchFields: ['title', 'description', 'venue'],
@@ -167,6 +167,13 @@ const load = useCallback(async () => {
   };
 
 const openAdd = () => { setEditing(null); setForm({ ...EMPTY, benefits: [] }); setFormErrors(null); statusRef.current = 'published'; save.resetKey(); setOpen(true); };
+
+  useEffect(() => {
+    if (searchParams.get('new') !== '1') return;
+    openAdd();
+    setSearchParams({}, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 const openEdit = (r) => {
     setEditing(r);
     setForm({

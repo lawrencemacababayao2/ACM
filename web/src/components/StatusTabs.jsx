@@ -21,6 +21,15 @@ export default function StatusTabs({
       <div className="status-tabs-list" role="tablist" aria-label={label}>
         {tabs.map((tab) => {
           const isActive = value === tab.value;
+          const count = tab.count ?? 0;
+          let countClass = "";
+          if (tab.sidebarCount) {
+            countClass = countsLoading || count === 0 ? "zero" : "red";
+          } else if (tab.tone === "amber") {
+            countClass = "amber";
+          } else if (tab.tone === "green") {
+            countClass = "green";
+          }
           return (
             <button
               key={tab.value || 'all'}
@@ -31,10 +40,10 @@ export default function StatusTabs({
               onClick={() => onChange?.(tab.value)}
             >
               <span>{tab.label}</span>
-              <span className={`status-tab-count ${tab.tone === 'amber' ? 'amber' : tab.tone === 'green' ? 'green' : ''}`}>
+              <span className={`status-tab-count ${countClass}`}>
                 {countsLoading
                   ? <Skeleton width={22} height={13} radius={7} style={{ verticalAlign: -1 }} />
-                  : ` ${tab.count ?? 0}`}
+                  : ` ${count}`}
               </span>
             </button>
           );

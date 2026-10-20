@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import useOnlineStatus from '../hooks/useOnlineStatus.js';
 import useFormDraft from '../hooks/useFormDraft.js';
@@ -132,6 +133,14 @@ const load = useCallback(async () => {
   };
 
 const openAdd = () => { setEditing(null); setForm(EMPTY); setFormErrors(null); statusRef.current = 'published'; save.resetKey(); setOpen(true); };
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('new') !== '1') return;
+    openAdd();
+    setSearchParams({}, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const openEdit = (r) => {
     setEditing(r);
     setForm({

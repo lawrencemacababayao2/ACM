@@ -94,6 +94,7 @@ async function getContact() {
 
 // GET /api/landing-sections?key=about   >> public
 router.get('/', optionalAuth, wrap(async (req, res) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
   const { key } = req.query;
   if (key) {
     if (!KEYS.has(key)) throw new HttpError(404, 'Section not found');

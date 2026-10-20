@@ -8,6 +8,7 @@ const router = Router();
 
 // GET /api/carousel?all=1  — public: active slides ordered by sort_order; ?all=1 includes inactive (admin)
 router.get('/', optionalAuth, wrap(async (req, res) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
   const all = req.query.all === '1';
   // Test membership, not an exact string: a SUPER_ADMIN is an admin too, and
   // matching role === 'admin' here locked the Landing Content screen out.
@@ -52,6 +53,26 @@ router.put('/reorder', auth, adminOnly, wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// PUT /api/carousel/:id/status - admin: toggle status only
+router.put('/:id/status', auth, adminOnly, wrap(async (req, res) => {
+  const { status } = req.body || {};
+  const next = status === 'active' ? 'active' : 'inactive';
+  const [rows] = await pool.query('SELECT id FROM carousel_slides WHERE id = ?', [req.params.id]);
+  if (!rows[0]) throw new HttpError(404, 'Slide not found');
+  await pool.query('UPDATE carousel_slides SET status = ? WHERE id = ?', [next, req.params.id]);
+  res.json({ ok: true, status: next });
+}));
+
+// PATCH /api/carousel/:id/status - admin: toggle status only
+router.patch('/:id/status', auth, adminOnly, wrap(async (req, res) => {
+  const { status } = req.body || {};
+  const next = status === 'active' ? 'active' : 'inactive';
+  const [rows] = await pool.query('SELECT id FROM carousel_slides WHERE id = ?', [req.params.id]);
+  if (!rows[0]) throw new HttpError(404, 'Slide not found');
+  await pool.query('UPDATE carousel_slides SET status = ? WHERE id = ?', [next, req.params.id]);
+  res.json({ ok: true, status: next });
+}));
+
 // PUT /api/carousel/:id
 router.put('/:id', auth, adminOnly, idempotent(), wrap(async (req, res) => {
   const { title, subtitle, category, image_url, link, sort_order, status } = req.body || {};
@@ -61,11 +82,12 @@ router.put('/:id', auth, adminOnly, idempotent(), wrap(async (req, res) => {
   const [rows] = await pool.query('SELECT id FROM carousel_slides WHERE id = ?', [req.params.id]);
   if (!rows[0]) throw new HttpError(404, 'Slide not found');
   const order = Math.max(0, Number(sort_order) || 0);
+  const st = status === 'active' ? 'active' : 'inactive';
   await pool.query(
     `UPDATE carousel_slides
      SET title = ?, subtitle = ?, category = ?, image_url = ?, link = ?, sort_order = ?, status = ?
      WHERE id = ?`,
-    [title.trim(), subtitle || null, category || 'Agriculture', image_url.trim(), link || null, order, status || 'active', req.params.id]
+    [title.trim(), subtitle || null, category || 'Agriculture', image_url.trim(), link || null, order, st, req.params.id]
   );
   res.json({ ok: true });
 }));

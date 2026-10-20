@@ -62,7 +62,7 @@ import { SelectControl } from "../reportTypes.jsx";
 // table reflects where each training actually is in time.
 const STATUS_TABS = [
   { value: "", label: "All" },
-  { value: "upcoming", label: "Upcoming" },
+  { value: "upcoming", label: "Upcoming", sidebarCount: true },
   { value: "ongoing", label: "Ongoing" },
   { value: "completed", label: "Completed" },
   { value: "cancelled", label: "Cancelled" },
@@ -180,7 +180,7 @@ export default function Trainings() {
     [all, now],
   );
 
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const filters = useRecordFilters(phasing, {
     statusField: "phase",
     searchFields: ["title", "description", "venue"],
@@ -225,6 +225,13 @@ export default function Trainings() {
     save.resetKey();
     setOpen(true);
   };
+
+  useEffect(() => {
+    if (searchParams.get("new") !== "1") return;
+    openAdd();
+    setSearchParams({}, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const openEdit = (r) => {
     setEditing(r);
     setForm({
