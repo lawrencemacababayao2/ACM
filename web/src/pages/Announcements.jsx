@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
+import { applyCapitalizeFirst, capitalizeFirst } from '../lib/text.js';
 import useOnlineStatus from '../hooks/useOnlineStatus.js';
 import useFormDraft from '../hooks/useFormDraft.js';
 import useFormSubmit from '../hooks/useFormSubmit.js';
@@ -158,6 +159,9 @@ const openAdd = () => { setEditing(null); setForm(EMPTY); setFormErrors(null); s
   };
   const clearFieldError = (k) => setFormErrors((prev) => (prev && prev[k] ? { ...prev, [k]: undefined } : prev));
   const set = (k) => (e) => { setForm({ ...form, [k]: e.target.value }); clearFieldError(k); };
+  // Title and content are display text, so the first letter is capitalized live as
+  // the user types while the caret stays put. Nothing else in the value changes.
+  const setText = (k) => (e) => { const v = applyCapitalizeFirst(e.target); setForm({ ...form, [k]: v }); clearFieldError(k); };
   const setFlag = (k) => (e) => setForm({ ...form, [k]: e.target.checked });
   // TypeMultiSelect hands back the whole array.
   const setTargets = (v) => { setForm({ ...form, target_beneficiary_types: v }); clearFieldError('target_beneficiary_types'); };
@@ -202,8 +206,8 @@ const openAdd = () => { setEditing(null); setForm(EMPTY); setFormErrors(null); s
       return;
     }
     const payload = {
-      title: form.title,
-      body: form.body,
+      title: capitalizeFirst(form.title.trim()),
+      body: capitalizeFirst(form.body),
       target_beneficiary_types: normalizeTypes(form.target_beneficiary_types),
       send_sms: form.send_sms,
       status,
@@ -330,7 +334,7 @@ meta={filters.isFiltered
           sortDir={sortDir}
           onSort={handleSort}
           columns={[
-            { key: 'title', label: 'Title', render: (r) => <strong>{r.title}</strong> },
+            { key: 'title', label: 'Title', render: (r) => <strong>{capitalizeFirst(r.title)}</strong> },
             { key: 'body', label: 'Content', render: (r) => <span className="muted">{String(r.body).slice(0, 90)}{String(r.body).length > 90 ? '…' : ''}</span> },
             { key: 'target_type', label: 'Target', render: (r) => <TargetTypeBadges row={r} /> },
             { key: 'status', label: 'Status', render: (r) => <StatusBadge value={r.status} /> },
@@ -365,11 +369,11 @@ meta={filters.isFiltered
           <DraftNotice savedAt={draft.savedAt} restoredAt={draft.restoredAt} onDiscard={() => { draft.clear(); setForm(EMPTY); setFormErrors(null); }} />
           <FormError error={save.error} onRetry={() => { void submit(); }} />
           <Field label="Title" required error={Boolean(fieldError('title'))}>
-            <input value={form.title} onChange={set('title')} required />
+            <input value={form.title} onChange={setText('title')} onBlur={(e) => setForm({ ...form, title: capitalizeFirst(e.target.value.trim()) })} required />
             {fieldError('title') && <span className="error">{fieldError('title')}</span>}
           </Field>
           <Field label="Content" required error={Boolean(fieldError('body'))}>
-            <textarea value={form.body} onChange={set('body')} required rows={6} />
+            <textarea value={form.body} onChange={setText('body')} onBlur={(e) => setForm({ ...form, body: capitalizeFirst(e.target.value) })} required rows={6} />
             {fieldError('body') && <span className="error">{fieldError('body')}</span>}
           </Field>
           <Field label="Target Beneficiary Type" required error={Boolean(fieldError('target_beneficiary_types'))}>

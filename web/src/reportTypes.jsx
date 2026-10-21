@@ -13,6 +13,7 @@ import Icon from './components/Icon.jsx';
 import DatePicker from './components/DatePicker.jsx';
 import FilterPill from './components/FilterPill.jsx';
 import { pad } from './lib/dateUtils.js';
+import { applyCapitalizeFirst, capitalizeFirst } from './lib/text.js';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -357,7 +358,16 @@ export function renderField(field, form, ctx) {
         );
 
       case 'textarea':
-        return <textarea value={value ?? ''} onChange={(e) => set(e.target.value)} rows={3} />;
+        // A multi-line field is free description/notes: capitalize the first
+        // letter live, leaving single-line text (names, tags) untouched.
+        return (
+          <textarea
+            value={value ?? ''}
+            onChange={(e) => set(applyCapitalizeFirst(e.target))}
+            onBlur={(e) => set(capitalizeFirst(e.target.value))}
+            rows={3}
+          />
+        );
 
       case 'beneficiary':
         return <BeneficiaryControl value={value} onChange={set} onPick={ctx.onBeneficiaryPick} />;

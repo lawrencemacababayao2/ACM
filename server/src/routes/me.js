@@ -12,6 +12,7 @@ import {
 } from '../services/otp.js';
 import { checkUserDuplicates, checkBeneficiaryDuplicates, checkUserDuplicateFields, duplicateErrors } from '../services/duplicates.js';
 import { passwordProblem } from '../lib/password.js';
+import { nameProblem, formatName } from '../lib/name.js';
 import { sendOne, getSmsCredits } from '../services/sms.js';
 import rateLimits from '../config/rateLimits.js';
 import { makeLimiter, phoneKey, consumeDailyBudget } from '../middleware/rateLimit.js';
@@ -86,19 +87,18 @@ router.patch('/profile', auth, wrap(async (req, res) => {
   if (user.role === 'beneficiary') throw new HttpError(403, 'Your profile is managed by the Municipal Agriculture Office');
 
   const body = req.body || {};
-  const first_name = String(body.first_name ?? '').trim();
-  const middle_name = String(body.middle_name ?? '').trim() || null;
-  const last_name = String(body.last_name ?? '').trim();
+  const first_name = formatName(body.first_name);
+  const middle_name = formatName(body.middle_name) || null;
+  const last_name = formatName(body.last_name);
   const email = String(body.email ?? '').trim().toLowerCase() || null;
   const mobile_number = String(body.mobile_number ?? '').trim() || null;
 
-  if (!first_name) throw new HttpError(400, 'First name is required', { field: 'first_name' });
-  if (!last_name) throw new HttpError(400, 'Last name is required', { field: 'last_name' });
-  for (const [field, value] of Object.entries({ first_name, middle_name, last_name })) {
-    if (value && value.length > MAX_NAME_LENGTH) {
-      throw new HttpError(400, `Name parts must be ${MAX_NAME_LENGTH} characters or fewer`, { field });
-    }
-  }
+  const firstErr = nameProblem(first_name, { label: 'First name', maxLength: MAX_NAME_LENGTH });
+  if (firstErr) throw new HttpError(400, firstErr, { field: 'first_name' });
+  const lastErr = nameProblem(last_name, { label: 'Last name', maxLength: MAX_NAME_LENGTH });
+  if (lastErr) throw new HttpError(400, lastErr, { field: 'last_name' });
+  const middleErr = nameProblem(middle_name, { required: false, label: 'Middle name', maxLength: MAX_NAME_LENGTH });
+  if (middleErr) throw new HttpError(400, middleErr, { field: 'middle_name' });
   if (email && !EMAIL_RE.test(email)) throw new HttpError(400, 'Enter a valid email address', { field: 'email' });
   if (!mobile_number) throw new HttpError(400, 'Mobile number is required', { field: 'mobile_number' });
   if (!MOBILE_RE.test(mobile_number)) {

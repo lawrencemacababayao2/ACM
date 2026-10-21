@@ -8,6 +8,7 @@ import { getLocationOptions } from '../data/locations.js';
 import { validateMobile } from '../services/otp.js';
 import { checkBeneficiaryDuplicateFields, checkUserDuplicates, duplicateErrors } from '../services/duplicates.js';
 import { passwordProblem, passwordMatchReason } from '../lib/password.js';
+import { nameProblem, formatName } from '../lib/name.js';
 
 // Mirrors the messages used by POST /api/auth/register for the same two failures,
 // so a bad number reads identically whichever way it was submitted.
@@ -188,19 +189,6 @@ router.post('/', auth, adminOnly, idempotent(), wrap(async (req, res) => {
   }
 
   // Validate names
-  const NAME_MIN_LENGTH = 2;
-  const NAME_ALLOWED = /^[\p{L}\p{M}'.\- ]+$/u;
-  const HAS_LETTER = /\p{L}/u;
-
-  function cleanName(value, label) {
-    const v = String(value ?? '').trim().replace(/\s+/g, ' ');
-    if (!v) throw new HttpError(400, `${label} is required`);
-    if (v.length < NAME_MIN_LENGTH || !NAME_ALLOWED.test(v) || !HAS_LETTER.test(v)) {
-      throw new HttpError(400, `Please enter a valid ${label.toLowerCase()}`);
-    }
-    return v;
-  }
-
   const firstNameValue = cleanName(firstName, 'First name', 'first_name');
   const lastNameValue = cleanName(lastName, 'Last name', 'last_name');
   const middleNameValue = middleName && String(middleName).trim()
@@ -359,17 +347,12 @@ const FIELDS = {
 };
 
 const SUFFIXES = ['', 'Jr.', 'Sr.', 'I', 'II', 'III', 'IV'];
-const NAME_MIN_LENGTH = 2;
-const NAME_ALLOWED = /^[\p{L}\p{M}'.\- ]+$/u;
-const HAS_LETTER = /\p{L}/u;
 const BENEFICIARY_TYPES = ['farmer', 'fisherfolk', 'livestock_owner'];
 
 function cleanName(value, label, field) {
-  const v = String(value ?? '').trim().replace(/\s+/g, ' ');
-  if (!v) throw new HttpError(400, `${label} is required`, { field });
-  if (v.length < NAME_MIN_LENGTH || !NAME_ALLOWED.test(v) || !HAS_LETTER.test(v)) {
-    throw new HttpError(400, `Please enter a valid ${label.toLowerCase()}`, { field });
-  }
+  const v = formatName(value);
+  const problem = nameProblem(v, { label, maxLength: 50 });
+  if (problem) throw new HttpError(400, problem, field ? { field } : undefined);
   return v;
 }
 

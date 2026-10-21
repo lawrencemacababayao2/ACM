@@ -1,5 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import Icon from './Icon.jsx';
+import { applyCapitalizeFirst, capitalizeFirst } from '../lib/text.js';
 
 export default function BenefitsField({ benefits, onChange }) {
   const inputsRef = useRef([]);
@@ -22,7 +23,7 @@ export default function BenefitsField({ benefits, onChange }) {
   };
 
   const handleBlur = (index) => {
-    const trimmed = benefits[index]?.trim() ?? '';
+    const trimmed = capitalizeFirst(benefits[index]?.trim() ?? '');
     if (trimmed !== benefits[index]) {
       onChange(benefits.map((b, i) => (i === index ? trimmed : b)));
     }
@@ -35,7 +36,7 @@ export default function BenefitsField({ benefits, onChange }) {
           <input
             ref={(el) => { inputsRef.current[i] = el; }}
             value={b}
-            onChange={(e) => handleChange(i, e.target.value)}
+            onChange={(e) => handleChange(i, applyCapitalizeFirst(e.target))}
             onBlur={() => handleBlur(i)}
             placeholder={`Benefit ${i + 1}`}
             style={{ flex: 1 }}

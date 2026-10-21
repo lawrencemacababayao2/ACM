@@ -1,7 +1,7 @@
 import { clearAllDrafts } from './lib/draftStore.js';
 
 const BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
-const REQUEST_TIMEOUT_MS = 15000;
+const REQUEST_TIMEOUT_MS = 60000;
 
 // Origin that serves uploaded files (BASE without the trailing /api). Relative
 // "/uploads/..." paths are turned into full URLs for <img>/links; data: and

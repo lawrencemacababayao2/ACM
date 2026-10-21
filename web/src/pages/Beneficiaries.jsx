@@ -14,6 +14,7 @@ import Field from '../components/Field.jsx';
 import PasswordInput from '../components/PasswordInput.jsx';
 import PasswordChecklist from '../components/PasswordChecklist.jsx';
 import { passwordProblem, passwordMatchReason, PASSWORD_MISMATCH } from '../lib/password.js';
+import { formatNameInput, nameProblem, displayName } from '../lib/name.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import TypeBadge from '../components/TypeBadge.jsx';
 import ActionMenu from '../components/ActionMenu.jsx';
@@ -81,35 +82,11 @@ function formatRsbsaInput(raw) {
   return out;
 }
 
-// Name rules mirror mobile/src/validation.js. The birthday floor also mirrors the
+// Name rules mirror server/src/lib/name.js. The birthday floor also mirrors the
 // MIN_AGE check in mobile/src/screens/RegisterWizard.jsx, so an admin cannot save
 // a record the registration form would have refused. There is deliberately no
 // upper age cap: an older beneficiary is still a valid beneficiary.
-const NAME_MIN_LENGTH = 2;
 const MIN_AGE = 18;
-
-// Letters from any script, plus the punctuation that legitimately appears
-// inside a name. This is what rejects "John123" and "Juan@Home".
-const NAME_ALLOWED = /^[\p{L}\p{M}'.\- ]+$/u;
-const HAS_LETTER = /\p{L}/u;
-
-function nameReason(value) {
-  const v = String(value ?? '').trim();
-  if (!v) return 'required';
-  if (v.length < NAME_MIN_LENGTH) return 'invalid';
-  if (!NAME_ALLOWED.test(v) || !HAS_LETTER.test(v)) return 'invalid';
-  return null;
-}
-
-function nameMessage(reason, label) {
-  return reason === 'required' ? `${label} is required` : `Please enter a valid ${label}`;
-}
-
-// Surrounding whitespace removed, runs of spaces collapsed. Names are
-// deliberately left in the case the user typed, so nothing is auto-capitalized.
-function normalizeName(value) {
-  return String(value ?? '').trim().replace(/\s+/g, ' ');
-}
 
 // A birthday must be the date it claims to be, so 31 February and the like are
 // rejected. The components are compared after the round trip rather than
@@ -169,7 +146,7 @@ function displayValue(value) {
 // one, and the suffix is always last.
 function formatFullName(row) {
   if (!row) return '';
-  const parts = [row.first_name, row.middle_name, row.last_name].filter(Boolean);
+  const parts = [row.first_name, row.middle_name, row.last_name].filter(Boolean).map(displayName);
   const name = parts.join(' ');
   return row.suffix ? `${name} ${row.suffix}`.trim() : name;
 }
@@ -550,6 +527,27 @@ const setEditValue = (key, value) => {
     setSubmitDupErrors([]);
   };
 
+  // Capitalize a name field while typing, keeping the caret where the user is.
+  const setNameValue = (key) => (e) => {
+    const input = e.target;
+    const caret = input.selectionStart;
+    const next = formatNameInput(input.value);
+    const delta = next.length - input.value.length;
+    setEditValue(key, next);
+    requestAnimationFrame(() => {
+      if (input.setSelectionRange) input.setSelectionRange(caret + delta, caret + delta);
+    });
+  };
+
+  const blurNameValue = (key, label) => (e) => {
+    const next = formatNameInput(e.target.value);
+    setEditValue(key, next);
+    const problem = key === 'middle_name' && !next
+      ? null
+      : nameProblem(next, { required: key !== 'middle_name', label });
+    setEditErrors((prev) => ({ ...prev, [key]: problem || undefined }));
+  };
+
   // Changing a parent clears its children, so a stale value cannot survive.
   const handleProvinceChange = (value) => {
     setEditForm((prev) => ({ ...prev, province: value, barangay: '', purok: '' }));
@@ -616,17 +614,17 @@ const setEditValue = (key, value) => {
       errors.beneficiary_type = 'Please select a beneficiary type';
     }
 
-    const first = nameReason(editForm.first_name);
-    if (first) errors.first_name = nameMessage(first, 'first name');
+    const first = nameProblem(editForm.first_name, { required: true, label: 'First name' });
+    if (first) errors.first_name = first;
 
     // Only required while the box is unticked, which mirrors the wizard.
     if (!editForm.no_middle_name) {
-      const middle = nameReason(editForm.middle_name);
-      if (middle) errors.middle_name = nameMessage(middle, 'middle name');
+      const middle = nameProblem(editForm.middle_name, { required: true, label: 'Middle name' });
+      if (middle) errors.middle_name = middle;
     }
 
-    const last = nameReason(editForm.last_name);
-    if (last) errors.last_name = nameMessage(last, 'last name');
+    const last = nameProblem(editForm.last_name, { required: true, label: 'Last name' });
+    if (last) errors.last_name = last;
 
     if (editForm.suffix && !SUFFIXES.some((s) => s.value === editForm.suffix)) {
       errors.suffix = 'Please select a valid suffix';
@@ -718,7 +716,7 @@ const mobile = editForm.mobile_number.replace(/\D/g, '');
     if (dupBlocked) return;
 
     const type = editForm.beneficiary_type;
-    const middle = editForm.no_middle_name ? null : normalizeName(editForm.middle_name);
+    const middle = editForm.no_middle_name ? null : formatName(editForm.middle_name);
 
     const payload = {
       beneficiary_type: type,
@@ -727,10 +725,10 @@ const mobile = editForm.mobile_number.replace(/\D/g, '');
       // instead of being shown as a second, separately editable field.
       category: type,
       rsbsa_number: editForm.rsbsa_number.replace(/\D/g, ''),
-      first_name: normalizeName(editForm.first_name),
+      first_name: formatName(editForm.first_name),
       suffix: editForm.suffix || null,
       middle_name: middle,
-      last_name: normalizeName(editForm.last_name),
+      last_name: formatName(editForm.last_name),
       gender: editForm.gender || null,
       birthday: editForm.birthday || null,
       province: editForm.province,
@@ -1166,9 +1164,9 @@ const setStatusOf = async (beneficiary, nextStatus) => {
             </div>
 
             <DetailSection icon="user" title="Personal Information">
-              <DetailItem label="First Name">{displayValue(selectedBeneficiary.first_name)}</DetailItem>
-              <DetailItem label="Middle Name">{displayValue(selectedBeneficiary.middle_name)}</DetailItem>
-              <DetailItem label="Last Name">{displayValue(selectedBeneficiary.last_name)}</DetailItem>
+              <DetailItem label="First Name">{displayValue(displayName(selectedBeneficiary.first_name))}</DetailItem>
+              <DetailItem label="Middle Name">{displayValue(displayName(selectedBeneficiary.middle_name))}</DetailItem>
+              <DetailItem label="Last Name">{displayValue(displayName(selectedBeneficiary.last_name))}</DetailItem>
               <DetailItem label="Suffix">{displayValue(selectedBeneficiary.suffix)}</DetailItem>
               <DetailItem label="Gender">{genderLabel(selectedBeneficiary.gender)}</DetailItem>
               <DetailItem label="Birthday">{formatDate(selectedBeneficiary.birthday)}</DetailItem>
@@ -1254,8 +1252,8 @@ const setStatusOf = async (beneficiary, nextStatus) => {
                 type="text"
                 ref={setInputRef('first_name')}
                 value={editForm.first_name}
-                onChange={(e) => setEditValue('first_name', e.target.value)}
-                onBlur={(e) => setEditValue('first_name', normalizeName(e.target.value))}
+                onChange={setNameValue('first_name')}
+                onBlur={blurNameValue('first_name', 'First name')}
                 required
                 placeholder="Enter first name"
                 data-no-capitalize="true"
@@ -1279,8 +1277,8 @@ const setStatusOf = async (beneficiary, nextStatus) => {
                 type="text"
                 ref={setInputRef('middle_name')}
                 value={editForm.middle_name}
-                onChange={(e) => setEditValue('middle_name', e.target.value)}
-                onBlur={(e) => setEditValue('middle_name', normalizeName(e.target.value))}
+                onChange={setNameValue('middle_name')}
+                onBlur={blurNameValue('middle_name', 'Middle name')}
                 disabled={editForm.no_middle_name}
                 placeholder="Enter middle name"
                 data-no-capitalize="true"
@@ -1301,8 +1299,8 @@ const setStatusOf = async (beneficiary, nextStatus) => {
                 type="text"
                 ref={setInputRef('last_name')}
                 value={editForm.last_name}
-                onChange={(e) => setEditValue('last_name', e.target.value)}
-                onBlur={(e) => { setEditValue('last_name', normalizeName(e.target.value)); checkOnBlur('last_name')(); }}
+                onChange={setNameValue('last_name')}
+                onBlur={(e) => { blurNameValue('last_name', 'Last name')(e); checkOnBlur('last_name')(); }}
                 required
                 placeholder="Enter last name"
                 data-no-capitalize="true"

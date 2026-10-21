@@ -4,6 +4,7 @@ import { auth, adminOnly } from '../middleware/auth.js';
 import { idempotent } from '../middleware/idempotency.js';
 import { sendOne } from '../services/sms.js';
 import { wrap, HttpError } from '../lib/utils.js';
+import { capitalizeFirst } from '../lib/text.js';
 import { createAnimalHealthRecordFromRequest } from '../lib/animalHealthRequestHook.js';
 import { checkBeneficiaryDuplicates, duplicateConflict } from '../services/duplicates.js';
 import { normalizeBeneficiaryTypes, validateSubmission, buildDetails, REQUEST_CONFIG } from '../lib/requestConfig.js';
@@ -340,7 +341,8 @@ router.post('/', auth, idempotent(), wrap(async (req, res) => {
 
 // PUT /api/requests/:id  (admin updates status)
 router.put('/:id', auth, adminOnly, idempotent(), wrap(async (req, res) => {
-  const { status, scheduled_for, admin_notes } = req.body || {};
+  const { status, scheduled_for } = req.body || {};
+  const admin_notes = req.body?.admin_notes != null ? capitalizeFirst(req.body.admin_notes) : req.body?.admin_notes;
   const [rows] = await pool.query(`${JOIN} WHERE r.id = ?`, [req.params.id]);
   if (!rows[0]) throw new HttpError(404, 'Request not found');
   // A correction has to go through approve/reject so the beneficiary row is
@@ -411,7 +413,7 @@ router.post('/:id/approve', auth, adminOnly, idempotent(), wrap(async (req, res)
   if (!reqRow) throw new HttpError(404, 'Request not found');
   if (reqRow.status !== 'pending') throw new HttpError(400, 'This request has already been decided');
 
-  const { admin_notes: adminNotes } = req.body || {};
+  const adminNotes = req.body?.admin_notes != null ? capitalizeFirst(req.body.admin_notes) : undefined;
 
   let appliedNote = null;
   if (reqRow.type === 'profile_correction') {
@@ -457,14 +459,14 @@ router.post('/:id/reject', auth, adminOnly, idempotent(), wrap(async (req, res) 
   if (!reqRow) throw new HttpError(404, 'Request not found');
   if (reqRow.status !== 'pending') throw new HttpError(400, 'This request has already been decided');
 
-  const { reason } = req.body || {};
+  const reason = req.body?.reason ? capitalizeFirst(String(req.body.reason).trim()) : null;
   await pool.query(
     "UPDATE requests SET status = 'rejected', decision_reason = ? WHERE id = ?",
-    [reason ? String(reason).trim() : null, req.params.id]
+    [reason, req.params.id]
   );
   await pool.query(
     'INSERT INTO request_status_log (request_id, status, note, changed_by) VALUES (?, ?, ?, ?)',
-    [req.params.id, 'rejected', reason ? String(reason).trim() : null, req.user.id]
+    [req.params.id, 'rejected', reason, req.user.id]
   );
 
   const isCorrection = reqRow.type === 'profile_correction';

@@ -15,6 +15,7 @@ import ReadOnlyField from '../components/ReadOnlyField.jsx';
 import PasswordInput from '../components/PasswordInput.jsx';
 import PasswordChecklist from '../components/PasswordChecklist.jsx';
 import { passwordProblem, passwordMatchReason, PASSWORD_MISMATCH, PASSWORD_MIN_LENGTH, PASSWORD_MAX_LENGTH } from '../lib/password.js';
+import { formatNameInput, nameProblem, displayName } from '../lib/name.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import ActionMenu from '../components/ActionMenu.jsx';
 import Icon from '../components/Icon.jsx';
@@ -156,6 +157,7 @@ export default function UserManagement() {
   // rather than leaving a double space behind it.
   const nameOf = (r) => [r.first_name, r.middle_name, r.last_name]
     .filter(Boolean)
+    .map(displayName)
     .join(' ') || r.email || 'Unnamed account';
 
   // The API refuses all of these, so the control is shown disabled with the reason
@@ -186,6 +188,41 @@ export default function UserManagement() {
 
   const set = (k) => (e) => { setForm({ ...form, [k]: e.target.value }); setSubmitDupErrors([]); };
   const setPill = (k) => (v) => { setForm({ ...form, [k]: v }); setSubmitDupErrors([]); };
+
+  // Live name handling: capitalize while typing (caret preserved) and validate on
+  // blur, then on every change once the field has been touched or submit tried.
+  const NAME_FIELDS = ['first_name', 'middle_name', 'last_name'];
+  const [nameTouched, setNameTouched] = useState({});
+  const [nameErrors, setNameErrors] = useState({});
+
+  const nameLabel = (k) => (k === 'first_name' ? 'First name' : k === 'last_name' ? 'Last name' : 'Middle name');
+
+  const setNameField = (k) => (e) => {
+    const input = e.target;
+    const caret = input.selectionStart;
+    const before = input.value;
+    const next = formatNameInput(input.value);
+    const delta = next.length - before.length;
+    setForm((f) => ({ ...f, [k]: next }));
+    setSubmitDupErrors([]);
+    if (nameTouched[k] || nameErrors[k]) {
+      setNameErrors((prev) => ({ ...prev, [k]: nameProblem(next, { required: k !== 'middle_name', label: nameLabel(k) }) || undefined }));
+    }
+    requestAnimationFrame(() => {
+      if (input.setSelectionRange) input.setSelectionRange(caret + delta, caret + delta);
+    });
+  };
+
+  const blurNameField = (k) => (e) => {
+    const next = formatNameInput(e.target.value);
+    setForm((f) => ({ ...f, [k]: next }));
+    setNameTouched((prev) => ({ ...prev, [k]: true }));
+    setNameErrors((prev) => ({ ...prev, [k]: nameProblem(next, { required: k !== 'middle_name', label: nameLabel(k) }) || undefined }));
+  };
+
+  const anyNameError = () => NAME_FIELDS.some((k) =>
+    nameProblem(form[k] || '', { required: k !== 'middle_name', label: nameLabel(k) })
+  );
 
   const requestClose = () => {
     if (save.busy) return;
@@ -224,6 +261,19 @@ export default function UserManagement() {
       if (problem) { setFormErrors({ password: problem }); return; }
     }
     setFormErrors(null);
+    // Name rules are the admin-side contract, so a bad name is blocked here and
+    // the first invalid field is focused rather than letting the API reject it.
+    const nextNameErrors = {};
+    for (const k of NAME_FIELDS) {
+      const problem = nameProblem(form[k] || '', { required: k !== 'middle_name', label: nameLabel(k) });
+      if (problem) nextNameErrors[k] = problem;
+    }
+    if (Object.keys(nextNameErrors).length) {
+      setNameErrors(nextNameErrors);
+      setNameTouched({ first_name: true, middle_name: true, last_name: true });
+      setTimeout(scrollToError, 0);
+      return;
+    }
     // A live duplicate verdict still blocks here, so Enter in a field cannot
     // bypass the disabled submit button.
     if (dupBlocked) return;
@@ -518,36 +568,42 @@ export default function UserManagement() {
           {/* First and last name share a row because they are the two required
               parts; middle name sits below so the required pair reads first.
               AutoComplete keeps the browser from fighting the field order. */}
-          <Field label="First name" required error={Boolean(dupByField.first_name)}>
+          <Field label="First name" required error={Boolean(nameErrors.first_name) || Boolean(dupByField.first_name)}>
             <input
               value={form.first_name}
-              onChange={set('first_name')}
+              onChange={setNameField('first_name')}
+              onBlur={blurNameField('first_name')}
               required
               autoComplete="given-name"
               data-no-capitalize="true"
             />
+            {nameErrors.first_name && <span className="error">{nameErrors.first_name}</span>}
             {fieldError('first_name') && <span className="error">{fieldError('first_name')}</span>}
             {dupByField.first_name && <span className="error">{dupByField.first_name}</span>}
           </Field>
 
-          <Field label="Last name" required>
+          <Field label="Last name" required error={Boolean(nameErrors.last_name)}>
             <input
               value={form.last_name}
-              onChange={set('last_name')}
+              onChange={setNameField('last_name')}
+              onBlur={blurNameField('last_name')}
               required
               autoComplete="family-name"
               data-no-capitalize="true"
             />
+            {nameErrors.last_name && <span className="error">{nameErrors.last_name}</span>}
             {fieldError('last_name') && <span className="error">{fieldError('last_name')}</span>}
           </Field>
 
-          <Field label="Middle name" hint="Optional · leave blank if there is none" col2>
+          <Field label="Middle name" hint="Optional · leave blank if there is none" col2 error={Boolean(nameErrors.middle_name)}>
             <input
               value={form.middle_name}
-              onChange={set('middle_name')}
+              onChange={setNameField('middle_name')}
+              onBlur={blurNameField('middle_name')}
               autoComplete="additional-name"
               data-no-capitalize="true"
             />
+            {nameErrors.middle_name && <span className="error">{nameErrors.middle_name}</span>}
             {fieldError('middle_name') && <span className="error">{fieldError('middle_name')}</span>}
           </Field>
 
@@ -645,9 +701,9 @@ export default function UserManagement() {
                   above already shows the full name; breaking it out is the whole
                   point of storing it in parts, and a blank middle name is normal
                   rather than a gap worth hiding. */}
-              <DetailItem label="First name">{viewing.first_name || '—'}</DetailItem>
-              <DetailItem label="Middle name">{viewing.middle_name || '—'}</DetailItem>
-              <DetailItem label="Last name">{viewing.last_name || '—'}</DetailItem>
+              <DetailItem label="First name">{displayName(viewing.first_name) || '—'}</DetailItem>
+              <DetailItem label="Middle name">{displayName(viewing.middle_name) || '—'}</DetailItem>
+              <DetailItem label="Last name">{displayName(viewing.last_name) || '—'}</DetailItem>
               <DetailItem label="Email">{viewing.email || '—'}</DetailItem>
               <DetailItem label="Mobile">{viewing.mobile_number || '—'}</DetailItem>
               <DetailItem label="Role">

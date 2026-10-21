@@ -10,6 +10,7 @@ import {
 } from '../services/otp.js';
 import { checkBeneficiaryDuplicates, checkBeneficiaryDuplicateFields, duplicateConflict } from '../services/duplicates.js';
 import { passwordProblem, passwordMatchReason } from '../lib/password.js';
+import { formatName, sanitizeName } from '../lib/name.js';
 import rateLimits from '../config/rateLimits.js';
 import {
   otpSendLimiters,
@@ -375,32 +376,30 @@ router.post('/register', wrap(async (req, res) => {
     throw new HttpError(400, 'Passwords do not match');
   }
   // --- Names -----------------------------------------------------------------
-  // The app validates these before submitting, but the API is the authority and
-  // re-checks them, because anything can post to this endpoint directly. A name
-  // is letters plus the punctuation that legitimately appears inside one
-  // ("O'Brien", "Dela-Cruz", "Ma. Clara"); digits and symbols are refused so
-  // junk cannot be written into a beneficiary record.
-  const NAME_MIN_LENGTH = 2;
-  const NAME_ALLOWED = /^[\p{L}\p{M}'.\- ]+$/u;
+  // The app validates these before submitting, but the API normalizes them so a
+  // record saved through any client is stored capitalized. This is the deployed
+  // mobile app's endpoint, so it stays lenient: disallowed characters are
+  // stripped rather than rejected, and the only hard failures are an empty name
+  // or one too long for the column.
+  const NAME_MAX_LENGTH = 50;
 
-  function cleanName(value, label) {
-    if (value == null || String(value).trim() === '') {
-      throw new HttpError(400, `${label} is required`);
+  function cleanName(value, label, { required = true } = {}) {
+    const sanitized = sanitizeName(value);
+    if (!sanitized) {
+      if (required) throw new HttpError(400, `${label} is required`);
+      return null;
     }
-    const v = String(value).trim().replace(/\s+/g, ' ');
-    if (v.length < NAME_MIN_LENGTH || !NAME_ALLOWED.test(v) || !/\p{L}/u.test(v)) {
+    if (sanitized.length > NAME_MAX_LENGTH) {
       throw new HttpError(400, `Please enter a valid ${label.toLowerCase()}`);
     }
-    return v;
+    return formatName(sanitized);
   }
 
   const firstNameValue = cleanName(firstName, 'First name');
   const lastNameValue = cleanName(lastName, 'Last name');
   // The middle name is optional here; the app only requires it when the
   // beneficiary has not ticked "I have no middle name".
-  const middleNameValue = middleName == null || String(middleName).trim() === ''
-    ? null
-    : cleanName(middleName, 'Middle name');
+  const middleNameValue = cleanName(middleName, 'Middle name', { required: false });
 
   if (!rsbsaNumber || !String(rsbsaNumber).trim()) throw new HttpError(400, 'RSBSA number is required');
 

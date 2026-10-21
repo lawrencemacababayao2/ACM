@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "../api.js";
+import { applyCapitalizeFirst, capitalizeFirst } from "../lib/text.js";
 import useOnlineStatus from "../hooks/useOnlineStatus.js";
 import useFormDraft from "../hooks/useFormDraft.js";
 import useFormSubmit from "../hooks/useFormSubmit.js";
@@ -943,7 +944,8 @@ function CorrectionPanel({
             <textarea
               rows={2}
               value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
+              onChange={(e) => setRejectReason(applyCapitalizeFirst(e.target))}
+              onBlur={(e) => setRejectReason(capitalizeFirst(e.target.value))}
               placeholder="Shown to the farmer if rejected"
               required
             />
@@ -1186,7 +1188,10 @@ function ItemPanel({
                 rows={3}
                 value={form.admin_notes}
                 onChange={(e) =>
-                  setForm({ ...form, admin_notes: e.target.value })
+                  setForm({ ...form, admin_notes: applyCapitalizeFirst(e.target) })
+                }
+                onBlur={(e) =>
+                  setForm({ ...form, admin_notes: capitalizeFirst(e.target.value) })
                 }
               />
             </Field>

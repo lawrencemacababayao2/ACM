@@ -5,6 +5,7 @@ import { idempotent } from '../middleware/idempotency.js';
 import { broadcastToVerified, notifyVerifiedApp } from '../services/sms.js';
 import { sendPush } from '../services/push.js';
 import { wrap, HttpError } from '../lib/utils.js';
+import { capitalizeFirst } from '../lib/text.js';
 import {
   normalizeTargetTypes,
   readTargetTypes,
@@ -137,7 +138,9 @@ router.get('/', optionalAuth, wrap(async (req, res) => {
 
 // POST /api/announcements  { title, body, target_beneficiary_types[], send_sms, status }
 router.post('/', auth, adminOnly, idempotent(), wrap(async (req, res) => {
-  const { title, body, send_sms, status, type } = req.body || {};
+  const title = capitalizeFirst(String(req.body?.title ?? '').trim());
+  const body = capitalizeFirst(req.body?.body ?? '');
+  const { send_sms, status, type } = req.body || {};
   if (!title || !body) throw new HttpError(400, 'Title and content are required');
   // `target_type` is still accepted as a fallback so an older client keeps working.
   const targets = requireTargetTypes(
@@ -150,13 +153,13 @@ router.post('/', auth, adminOnly, idempotent(), wrap(async (req, res) => {
     `INSERT INTO announcements (title, body, target_type, target_beneficiary_types, send_sms, status, published_at, type, created_by)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
-      String(title).trim(), body, legacyTargetType(targets), toJsonColumn(targets),
+      String(title), body, legacyTargetType(targets), toJsonColumn(targets),
       send_sms ? 1 : 0, st, publishedAt, type || 'announcement', req.user.id,
     ]
   );
 
   const newRow = {
-    id: r.insertId, title: String(title).trim(), body,
+    id: r.insertId, title, body,
     target_beneficiary_types: targets, target_type: legacyTargetType(targets),
     send_sms: send_sms ? 1 : 0, status: st, sms_sent: 0, notified: 0, notified_types: [], type: type || 'announcement',
   };
@@ -170,7 +173,9 @@ router.post('/', auth, adminOnly, idempotent(), wrap(async (req, res) => {
 
 // PUT /api/announcements/:id  { title, body, target_beneficiary_types[], send_sms, status }
 router.put('/:id', auth, adminOnly, idempotent(), wrap(async (req, res) => {
-  const { title, body, send_sms, status } = req.body || {};
+  const title = capitalizeFirst(String(req.body?.title ?? '').trim());
+  const body = capitalizeFirst(req.body?.body ?? '');
+  const { send_sms, status } = req.body || {};
   if (!title || !body) throw new HttpError(400, 'Title and content are required');
   const [rows] = await pool.query('SELECT id, published_at, sms_sent FROM announcements WHERE id = ?', [req.params.id]);
   if (!rows[0]) throw new HttpError(404, 'Announcement not found');
@@ -184,7 +189,7 @@ router.put('/:id', auth, adminOnly, idempotent(), wrap(async (req, res) => {
   const traits = rows[0].published_at ? 'republished' : 'published';
   await pool.query(
     `UPDATE announcements SET title = ?, body = ?, target_type = ?, target_beneficiary_types = ?, send_sms = ?, status = ?, published_at = ? WHERE id = ?`,
-    [String(title).trim(), body, legacyTargetType(targets), toJsonColumn(targets), send_sms ? 1 : 0, st, publishedAt, req.params.id]
+    [String(title), body, legacyTargetType(targets), toJsonColumn(targets), send_sms ? 1 : 0, st, publishedAt, req.params.id]
   );
 
   // Decide SMS from the persisted row so a draft saved with "send SMS" checked

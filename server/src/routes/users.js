@@ -6,6 +6,7 @@ import { idempotent } from '../middleware/idempotency.js';
 import { wrap, HttpError } from '../lib/utils.js';
 import { checkUserDuplicateFields, duplicateErrors } from '../services/duplicates.js';
 import { passwordProblem } from '../lib/password.js';
+import { nameProblem, formatName } from '../lib/name.js';
 
 const router = Router();
 
@@ -35,17 +36,17 @@ const text = (v) => String(v ?? '').trim();
 // First and last name are required because the roster is a list of people to
 // contact; a middle name is not. The same rule applies to create and edit.
 function readName(body) {
-  const first_name = text(body?.first_name);
-  const middle_name = text(body?.middle_name) || null;
-  const last_name = text(body?.last_name);
+  const first_name = formatName(body?.first_name);
+  const middle_name = formatName(body?.middle_name) || null;
+  const last_name = formatName(body?.last_name);
 
-  if (!first_name) throw new HttpError(400, 'First name is required', { field: 'first_name' });
-  if (!last_name) throw new HttpError(400, 'Last name is required', { field: 'last_name' });
-  for (const [field, value] of Object.entries({ first_name, middle_name, last_name })) {
-    if (value && value.length > MAX_NAME_LENGTH) {
-      throw new HttpError(400, `Name parts must be ${MAX_NAME_LENGTH} characters or fewer`, { field });
-    }
-  }
+  const firstErr = nameProblem(first_name, { label: 'First name', maxLength: MAX_NAME_LENGTH });
+  if (firstErr) throw new HttpError(400, firstErr, { field: 'first_name' });
+  const lastErr = nameProblem(last_name, { label: 'Last name', maxLength: MAX_NAME_LENGTH });
+  if (lastErr) throw new HttpError(400, lastErr, { field: 'last_name' });
+  const middleErr = nameProblem(middle_name, { required: false, label: 'Middle name', maxLength: MAX_NAME_LENGTH });
+  if (middleErr) throw new HttpError(400, middleErr, { field: 'middle_name' });
+
   return { first_name, middle_name, last_name };
 }
 

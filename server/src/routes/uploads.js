@@ -20,7 +20,7 @@ router.post('/', auth, adminOnly, wrap(async (req, res) => {
   const ext = m[1].toLowerCase() === 'jpeg' ? 'jpg' : m[1].toLowerCase();
   const buf = Buffer.from(m[2], 'base64');
   if (buf.length === 0) throw new HttpError(400, 'Empty image');
-  if (buf.length > 15 * 1024 * 1024) throw new HttpError(400, 'Image too large (max 15 MB)');
+  if (buf.length > 5 * 1024 * 1024) throw new HttpError(400, 'Image too large (max 5 MB)');
   if (!existsSync(UPLOAD_DIR)) mkdirSync(UPLOAD_DIR, { recursive: true });
   const name = `${Date.now()}-${randomBytes(6).toString('hex')}.${ext}`;
   writeFileSync(path.join(UPLOAD_DIR, name), buf);

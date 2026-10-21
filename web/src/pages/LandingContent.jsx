@@ -17,6 +17,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { api } from '../api.js';
+import { applyCapitalizeFirst, capitalizeFirst } from '../lib/text.js';
 import useOnlineStatus from '../hooks/useOnlineStatus.js';
 import useFormDraft from '../hooks/useFormDraft.js';
 import useFormSubmit from '../hooks/useFormSubmit.js';
@@ -92,7 +93,7 @@ const SECTION_ICONS = {
   carousel: 'image',
   about: 'content',
   stats: 'chart',
-  why: 'sparkles',
+  why: 'ThumbsUp',
   services: 'grid',
   contact: 'pin',
   faq: 'help',
@@ -164,7 +165,7 @@ function applyVisibleReorder(full, visibleIds, fromIndex, toIndex) {
 function LField({ label, col2, required, children }) {
   return (
     <div className={`field ${col2 ? 'field-col2' : ''}`}>
-      <span>{label}</span>
+      <span>{label}{required ? ' *' : ''}</span>
       {children}
     </div>
   );
@@ -229,7 +230,7 @@ function SortableSlideRow({ r, onPreview, onEdit, onToggle, onDelete, togglingId
       <div className="slide-row-thumb">{slideThumb(r, onPreview)}</div>
 
       <div className="slide-row-main">
-        <div className="slide-row-title">{r.title || '—'}</div>
+        <div className="slide-row-title">{r.title ? capitalizeFirst(r.title) : '—'}</div>
         <div className="slide-row-sub">{r.category}</div>
       </div>
 
@@ -285,6 +286,8 @@ export default function LandingContent() {
   const [editSlide, setEditSlide] = useState(null);
   const [slideForm, setSlideForm] = useState(EMPTY_SLIDE);
   const [uploading, setUploading] = useState(false);
+  const [slideError, setSlideError] = useState('');
+  const [itemErrors, setItemErrors] = useState({});
   const [uploadingImg, setUploadingImg] = useState(null);
   const [togglingId, setTogglingId] = useState(null);
 
@@ -465,6 +468,7 @@ export default function LandingContent() {
     next[i][field] = value;
     setItems(next);
     setDirty(true);
+    setItemErrors((prev) => (prev[`${i}:${field}`] ? { ...prev, [`${i}:${field}`]: undefined } : prev));
   };
 
   const setPoint = (itemIdx, pointIdx, field, value) => {
@@ -511,7 +515,9 @@ export default function LandingContent() {
 
   const uploadItemImage = async (file, i) => {
     if (!file) return;
-    if (!IMG_TYPES.includes(file.type)) { toast('Please choose a PNG, JPG, GIF or WebP image', 'err'); return; }
+    if (!IMG_TYPES.includes(file.type)) { setItemErrors((prev) => ({ ...prev, [`${i}:img`]: 'Please choose a PNG, JPG, GIF or WebP image' })); return; }
+    if (file.size > 5 * 1024 * 1024) { setItemErrors((prev) => ({ ...prev, [`${i}:img`]: 'Image too large (max 5 MB)' })); return; }
+    setItemErrors((prev) => ({ ...prev, [`${i}:img`]: undefined }));
     setUploadingImg(i);
     try {
       const dataUrl = await new Promise((resolve, reject) => {
@@ -523,7 +529,7 @@ export default function LandingContent() {
       const res = await api.post('/uploads', { dataUrl });
       setItem(i, 'img', res.url);
       toast('Image uploaded', 'ok');
-    } catch (err) { toast(err.message, 'err'); }
+    } catch (err) { setItemErrors((prev) => ({ ...prev, [`${i}:img`]: err.message || 'Upload failed' })); }
     finally { setUploadingImg(null); }
   };
 
@@ -540,7 +546,14 @@ export default function LandingContent() {
       );
     }
     if (['text', 'desc', 'short', 'intro'].includes(field)) {
-      return <textarea rows={2} value={val} onChange={(e) => setItem(i, field, e.target.value)} />;
+      return (
+        <textarea
+          rows={2}
+          value={val}
+          onChange={(e) => setItem(i, field, applyCapitalizeFirst(e.target))}
+          onBlur={(e) => setItem(i, field, capitalizeFirst(e.target.value))}
+        />
+      );
     }
     if (field === 'img') {
       const busy = uploadingImg === i;
@@ -571,12 +584,40 @@ export default function LandingContent() {
         </div>
       );
     }
+    // `title` and `label` are display text; `key` (a service slug) and `value`
+    // (a stats figure) are left exactly as typed.
+    if (field === 'title' || field === 'label') {
+      return (
+        <input
+          value={val}
+          onChange={(e) => setItem(i, field, applyCapitalizeFirst(e.target))}
+          onBlur={(e) => setItem(i, field, capitalizeFirst(e.target.value))}
+        />
+      );
+    }
     return <input value={val} onChange={(e) => setItem(i, field, e.target.value)} />;
+  };
+
+  // Section display-text fields, capitalized on save the same way the API does.
+  // `key`, `icon` and `value` are left alone.
+  const ITEM_TEXT_FIELDS = ['title', 'text', 'desc', 'short', 'intro', 'label'];
+  const capitalizePointPayload = (p) => (
+    typeof p === 'string'
+      ? capitalizeFirst(p)
+      : { ...p, title: capitalizeFirst(p.title), desc: capitalizeFirst(p.desc) }
+  );
+  const capitalizeItemPayload = (it) => {
+    const next = { ...it };
+    for (const f of ITEM_TEXT_FIELDS) {
+      if (typeof next[f] === 'string') next[f] = capitalizeFirst(next[f]);
+    }
+    if (Array.isArray(next.points)) next.points = next.points.map(capitalizePointPayload);
+    return next;
   };
 
   const save = async () => {
     const required = REQUIRED_FIELDS[section] || [];
-    const payload = items.map((it) => ({
+    const payload = items.map((it) => capitalizeItemPayload({
       ...it,
       points: Array.isArray(it.points) ? it.points.filter((p) =>
         typeof p === 'string' ? p.trim() !== '' : (p.title || '').trim() !== '' || (p.desc || '').trim() !== ''
@@ -586,24 +627,36 @@ export default function LandingContent() {
       required.filter((f) => isMissing(it, f)).map((f) => ({ i, f }))
     );
     if (missing.length) {
-      const { i, f } = missing[0];
-      toast(`Item ${i + 1}: "${f}" is required`, 'err');
-      document.getElementById(`landing-item-${i}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const nextErrors = {};
+      for (const { i, f } of missing) nextErrors[`${i}:${f}`] = 'This field is required';
+      setItemErrors(nextErrors);
+      setOpenItem(missing[0].i);
+      const { i } = missing[0];
+      setTimeout(() => document.getElementById(`landing-item-${i}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 0);
       return;
     }
     if (section === 'services') {
+      const pointError = {};
       for (let i = 0; i < payload.length; i++) {
         const pts = payload[i].points || [];
         for (let p = 0; p < pts.length; p++) {
           const pt = pts[p];
           if (!pt || typeof pt !== 'object' || !String(pt.title || '').trim() || !String(pt.desc || '').trim()) {
-            toast(`Item ${i + 1}: detail point ${p + 1} requires both "Title" and "Description"`, 'err');
-            document.getElementById(`landing-item-${i}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            return;
+            pointError[`${i}:points`] = `Detail point ${p + 1} requires both "Title" and "Description"`;
+            break;
           }
         }
+        if (pointError[`${i}:points`]) break;
+      }
+      if (Object.keys(pointError).length) {
+        setItemErrors(pointError);
+        const i = Number(Object.keys(pointError)[0].split(':')[0]);
+        setOpenItem(i);
+        setTimeout(() => document.getElementById(`landing-item-${i}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 0);
+        return;
       }
     }
+    setItemErrors({});
     setDirty(false);
     (async () => {
       try {
@@ -617,8 +670,11 @@ export default function LandingContent() {
     })().catch(() => {});
   };
 
+  // heading, title, address and hours are display text; phone and email are not.
+  const CONTACT_TEXT_FIELDS = ['heading', 'title', 'address', 'hours'];
   const setContact = (k) => (e) => {
-    setContactData({ ...contactData, [k]: e.target.value });
+    const v = CONTACT_TEXT_FIELDS.includes(k) ? applyCapitalizeFirst(e.target) : e.target.value;
+    setContactData({ ...contactData, [k]: v });
     setDirty(true);
   };
 
@@ -635,7 +691,15 @@ export default function LandingContent() {
         await contactSave.run({
           method: 'put',
           path: '/landing-sections/contact',
-          body: { content: contactData },
+          body: {
+            content: {
+              ...contactData,
+              heading: capitalizeFirst(String(contactData.heading || '').trim()),
+              title: capitalizeFirst(String(contactData.title || '').trim()),
+              address: capitalizeFirst(String(contactData.address || '').trim()),
+              hours: capitalizeFirst(String(contactData.hours || '').trim()),
+            },
+          },
           idempotent: false,
         });
       } catch {}
@@ -652,7 +716,9 @@ export default function LandingContent() {
 
   // ---- Carousel slide editing
   const setSlide = (k) => (e) => {
-    const v = k === 'sort_order' ? Math.max(0, Number(e.target.value) || 0) : e.target.value;
+    const v = k === 'sort_order'
+      ? Math.max(0, Number(e.target.value) || 0)
+      : (k === 'title' ? applyCapitalizeFirst(e.target) : e.target.value);
     setSlideForm({ ...slideForm, [k]: v });
   };
 
@@ -666,8 +732,10 @@ export default function LandingContent() {
 
   const uploadSlideImage = async (file) => {
     if (!file) return;
-    if (!IMG_TYPES.includes(file.type)) { toast('Please choose a PNG, JPG, GIF or WebP image', 'err'); return; }
+    if (!IMG_TYPES.includes(file.type)) { setSlideError('Please choose a PNG, JPG, GIF or WebP image'); return; }
+    if (file.size > 5 * 1024 * 1024) { setSlideError('Image too large (max 5 MB)'); return; }
     setUploading(true);
+    setSlideError('');
     try {
       const dataUrl = await new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -677,8 +745,7 @@ export default function LandingContent() {
       });
       const res = await api.post('/uploads', { dataUrl });
       setSlideForm((f) => ({ ...f, image_url: res.url }));
-      toast('Image uploaded', 'ok');
-    } catch (err) { toast(err.message, 'err'); }
+    } catch (err) { setSlideError(err.message || 'Upload failed'); }
     finally { setUploading(false); }
   };
 
@@ -701,7 +768,7 @@ export default function LandingContent() {
     if (slideSave.busy) return;
     if (uploading) { toast('Image is still uploading — wait a moment', 'err'); return; }
     if (!slideForm.image_url) { toast('Please upload a slide image first', 'err'); return; }
-    const title = String(slideForm.title || '').trim();
+    const title = capitalizeFirst(String(slideForm.title || '').trim());
     const category = String(slideForm.category || '').trim();
     if (!title) { toast('Caption is required', 'err'); return; }
     if (!category) { toast('Category is required', 'err'); return; }
@@ -780,7 +847,11 @@ export default function LandingContent() {
   };
 
   // ---- FAQ editing
-  const setFaq = (k) => (e) => setFaqForm({ ...faqForm, [k]: e.target.value });
+  // Question and answer are display text; keywords are lowercase search terms.
+  const setFaq = (k) => (e) => setFaqForm({
+    ...faqForm,
+    [k]: (k === 'question' || k === 'answer') ? applyCapitalizeFirst(e.target) : e.target.value,
+  });
   const openAddFaq = () => { setEditFaq(null); setFaqForm(EMPTY_FAQ); faqSave.resetKey(); setFaqOpen(true); };
   const openEditFaq = (r) => { setEditFaq(r); setFaqForm({ question: r.question, answer: r.answer, keywords: r.keywords || '' }); faqSave.resetKey(); setFaqOpen(true); };
 
@@ -804,7 +875,11 @@ export default function LandingContent() {
     const res = await faqSave.run({
       method: editFaq ? 'put' : 'post',
       path: editFaq ? `/faqs/${editFaq.id}` : '/faqs',
-      body: faqForm,
+      body: {
+        ...faqForm,
+        question: capitalizeFirst(String(faqForm.question || '').trim()),
+        answer: capitalizeFirst(faqForm.answer || ''),
+      },
     });
     if (!res) return;
     faqDraft.clear();
@@ -894,7 +969,7 @@ export default function LandingContent() {
             </button>
           )}
           <div className="acc-head-text">
-            <strong className="acc-title">{item.title || item.label || item.value || `Item ${idx + 1}`}</strong>
+            <strong className="acc-title">{item.title ? capitalizeFirst(item.title) : (item.label ? capitalizeFirst(item.label) : (item.value || `Item ${idx + 1}`))}</strong>
             {!isOpen && previewOf(item) ? (
               <span className="acc-preview">{previewOf(item)}</span>
             ) : null}
@@ -920,8 +995,10 @@ export default function LandingContent() {
                   label={f}
                   required={(REQUIRED_FIELDS[section] || []).includes(f)}
                   col2={['text', 'desc', 'short', 'intro', 'img'].includes(f)}
+                  error={Boolean(itemErrors[`${idx}:${f}`])}
                 >
                   {renderField(item, f, idx)}
+                  {itemErrors[`${idx}:${f}`] && <span className="error">{itemErrors[`${idx}:${f}`]}</span>}
                 </LField>
               ))}
             </div>
@@ -938,18 +1015,19 @@ export default function LandingContent() {
                   typeof p === 'string' ? (
                     <div className="grid2 point-row" key={pi}>
                       <LField label="Point" col2>
-                        <textarea rows={2} value={p} onChange={(e) => setPoint(idx, pi, 'point', e.target.value)} placeholder="e.g. Distribution of certified seeds and farm inputs" />
+                        <textarea rows={2} value={p} onChange={(e) => setPoint(idx, pi, 'point', applyCapitalizeFirst(e.target))} onBlur={(e) => setPoint(idx, pi, 'point', capitalizeFirst(e.target.value))} placeholder="e.g. Distribution of certified seeds and farm inputs" />
                       </LField>
                       <div className="point-del"><button className="ghost-icon-btn" onClick={() => removePoint(idx, pi)} aria-label={`Remove point ${pi + 1}`} title="Remove point"><Icon name="trash" size={14} /></button></div>
                     </div>
                   ) : (
                     <div className="grid2 point-row" key={pi}>
-                      <LField label="Title" required={section === 'services'}><input value={p.title || ''} onChange={(e) => setPoint(idx, pi, 'title', e.target.value)} /></LField>
-                      <LField label="Description" required={section === 'services'}><textarea rows={2} value={p.desc || ''} onChange={(e) => setPoint(idx, pi, 'desc', e.target.value)} /></LField>
+                      <LField label="Title" required={section === 'services'}><input value={p.title || ''} onChange={(e) => setPoint(idx, pi, 'title', applyCapitalizeFirst(e.target))} onBlur={(e) => setPoint(idx, pi, 'title', capitalizeFirst(e.target.value))} /></LField>
+                      <LField label="Description" required={section === 'services'}><textarea rows={2} value={p.desc || ''} onChange={(e) => setPoint(idx, pi, 'desc', applyCapitalizeFirst(e.target))} onBlur={(e) => setPoint(idx, pi, 'desc', capitalizeFirst(e.target.value))} /></LField>
                       <div className="point-del"><button className="ghost-icon-btn" onClick={() => removePoint(idx, pi)} aria-label={`Remove point ${pi + 1}`} title="Remove point"><Icon name="trash" size={14} /></button></div>
                     </div>
                   )
                 ))}
+                {itemErrors[`${idx}:points`] && <span className="error">{itemErrors[`${idx}:points`]}</span>}
               </div>
             )}
           </div>
@@ -1073,7 +1151,7 @@ export default function LandingContent() {
             <form onSubmit={submitSlide}>
               <DraftNotice savedAt={slideDraft.savedAt} restoredAt={slideDraft.restoredAt} onDiscard={() => { slideDraft.clear(); setSlideForm({ ...EMPTY_SLIDE }); }} />
               <FormError error={slideSave.error} onRetry={() => { void submitSlide(); }} />
-              <Field label="Slide image *" hint="Upload a photo shown on the landing website hero">
+              <Field label="Slide image *" hint="Upload a photo shown on the landing website hero" error={Boolean(slideError)}>
                 <div className="upload-grid">
                   {slideForm.image_url ? (
                     <div className="slide-thumb slide-thumb-lg">
@@ -1098,6 +1176,7 @@ export default function LandingContent() {
                     {slideForm.image_url && <button type="button" className="btn sm danger" onClick={() => setSlideForm({ ...slideForm, image_url: '' })}>Remove</button>}
                   </div>
                 </div>
+                {slideError && <span className="error">{slideError}</span>}
               </Field>
               <Field label="Caption" required hint="The text displayed on top of the image">
                 <textarea value={slideForm.title} onChange={setSlide('title')} rows={3} required placeholder="e.g. Free vaccination drive for livestock — July 30, municipal gym" />
@@ -1163,7 +1242,7 @@ export default function LandingContent() {
               {visibleFaqs.map((r) => (
                 <div className="card faq-card" key={r.id}>
                   <div className="faq-card-head">
-                    <strong className="faq-card-q">{r.question}</strong>
+                    <strong className="faq-card-q">{capitalizeFirst(r.question)}</strong>
                     <div className="row-actions">
                       <button className="btn sm" onClick={() => openEditFaq(r)}>Edit</button>
                       <button className="btn sm danger" onClick={() => removeFaq(r)}>Delete</button>

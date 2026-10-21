@@ -19,6 +19,7 @@ import { pool } from '../config/db.js';
 import { auth, roles } from '../middleware/auth.js';
 import { idempotent } from '../middleware/idempotency.js';
 import { wrap, HttpError } from '../lib/utils.js';
+import { capitalizeFirst } from '../lib/text.js';
 import { parseJsonList } from '../lib/jsonList.js';
 import {
   REPORT_TYPES, getReportType, resolveOptions, serialiseReportTypes,
@@ -387,7 +388,9 @@ function validateRecord(type, body, { partial = false, stored = {} } = {}) {
       continue;
     }
     if (text.length > 160) errors[field.key] = `${field.label} is too long`;
-    values[field.key] = text;
+    // A multi-line text field is free description/notes, so its first letter is
+    // capitalized; single-line text stays as typed (names, medicine tags).
+    values[field.key] = field.kind === 'textarea' ? capitalizeFirst(text) : text;
   }
 
   return { values, errors };

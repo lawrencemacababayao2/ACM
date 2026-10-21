@@ -3,6 +3,7 @@ import { pool } from '../config/db.js';
 import { auth, optionalAuth, adminOnly, ADMIN_ROLES } from '../middleware/auth.js';
 import { idempotent } from '../middleware/idempotency.js';
 import { wrap, HttpError } from '../lib/utils.js';
+import { capitalizeFirst } from '../lib/text.js';
 
 const router = Router();
 
@@ -25,15 +26,17 @@ router.get('/', optionalAuth, wrap(async (req, res) => {
 
 // POST /api/carousel
 router.post('/', auth, adminOnly, idempotent(), wrap(async (req, res) => {
-  const { title, subtitle, category, image_url, link, sort_order, status } = req.body || {};
-  if (!title || !String(title).trim()) throw new HttpError(400, 'Caption is required');
+  const { category, image_url, link, sort_order, status } = req.body || {};
+  const title = capitalizeFirst(String(req.body?.title ?? '').trim());
+  const subtitle = req.body?.subtitle ? capitalizeFirst(req.body.subtitle) : null;
+  if (!title) throw new HttpError(400, 'Caption is required');
   if (!image_url || !String(image_url).trim()) throw new HttpError(400, 'Slide image is required');
   if (!category || !String(category).trim()) throw new HttpError(400, 'Category is required');
   const order = Math.max(0, Number(sort_order) || 0);
   const [r] = await pool.query(
     `INSERT INTO carousel_slides (title, subtitle, category, image_url, link, sort_order, status)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [title.trim(), subtitle || null, category || 'Agriculture', image_url.trim(), link || null, order, status || 'active']
+    [title, subtitle, category || 'Agriculture', image_url.trim(), link || null, order, status || 'active']
   );
   res.status(201).json({ id: r.insertId });
 }));
@@ -75,8 +78,10 @@ router.patch('/:id/status', auth, adminOnly, wrap(async (req, res) => {
 
 // PUT /api/carousel/:id
 router.put('/:id', auth, adminOnly, idempotent(), wrap(async (req, res) => {
-  const { title, subtitle, category, image_url, link, sort_order, status } = req.body || {};
-  if (!title || !String(title).trim()) throw new HttpError(400, 'Caption is required');
+  const { category, image_url, link, sort_order, status } = req.body || {};
+  const title = capitalizeFirst(String(req.body?.title ?? '').trim());
+  const subtitle = req.body?.subtitle ? capitalizeFirst(req.body.subtitle) : null;
+  if (!title) throw new HttpError(400, 'Caption is required');
   if (!image_url || !String(image_url).trim()) throw new HttpError(400, 'Slide image is required');
   if (!category || !String(category).trim()) throw new HttpError(400, 'Category is required');
   const [rows] = await pool.query('SELECT id FROM carousel_slides WHERE id = ?', [req.params.id]);
@@ -87,7 +92,7 @@ router.put('/:id', auth, adminOnly, idempotent(), wrap(async (req, res) => {
     `UPDATE carousel_slides
      SET title = ?, subtitle = ?, category = ?, image_url = ?, link = ?, sort_order = ?, status = ?
      WHERE id = ?`,
-    [title.trim(), subtitle || null, category || 'Agriculture', image_url.trim(), link || null, order, st, req.params.id]
+    [title, subtitle, category || 'Agriculture', image_url.trim(), link || null, order, st, req.params.id]
   );
   res.json({ ok: true });
 }));

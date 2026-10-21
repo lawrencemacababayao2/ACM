@@ -5,6 +5,7 @@ import { sendPush } from '../services/push.js';
 import { auth, optionalAuth, adminOnly } from '../middleware/auth.js';
 import { idempotent } from '../middleware/idempotency.js';
 import { wrap, HttpError } from '../lib/utils.js';
+import { capitalizeFirst } from '../lib/text.js';
 import { trainingLifecycle } from '../lib/lifecycle.js';
 import {
   normalizeTargetTypes,
@@ -101,7 +102,7 @@ async function withBenefits(rows) {
 }
 
 async function replaceBenefits(trainingId, benefits) {
-  const list = Array.isArray(benefits) ? benefits.map((b) => String(b || '').trim()).filter(Boolean) : [];
+  const list = Array.isArray(benefits) ? benefits.map((b) => capitalizeFirst(String(b || '').trim())).filter(Boolean) : [];
   await pool.query('DELETE FROM training_benefits WHERE training_id = ?', [trainingId]);
   for (let i = 0; i < list.length; i++) {
     await pool.query(
@@ -216,7 +217,9 @@ router.get('/', optionalAuth, wrap(async (req, res) => {
 // POST /api/trainings  { title, description, benefits[], target_beneficiary_types[], venue, schedule, end_time, send_sms, status }
 // `status` is the publish state (draft|published), exactly like programs.
 router.post('/', auth, adminOnly, idempotent(), wrap(async (req, res) => {
-  const { title, description, venue, send_sms, status } = req.body || {};
+  const { venue, send_sms, status } = req.body || {};
+  const title = capitalizeFirst(String(req.body?.title ?? '').trim());
+  const description = req.body?.description ? capitalizeFirst(req.body.description) : null;
   if (!title) throw new HttpError(400, 'Title is required');
   // `target_type` is still accepted as a fallback so an older client keeps working.
   const targets = requireTargetTypes(
@@ -231,7 +234,7 @@ router.post('/', auth, adminOnly, idempotent(), wrap(async (req, res) => {
     `INSERT INTO trainings (title, description, target_type, target_beneficiary_types, venue, schedule, event_date, start_time, end_time, end_at, status, publish_status, published_at, created_by, send_sms, sms_sent, notified, show_on_website)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'upcoming', ?, ?, ?, ?, 0, 0, ?)`,
     [
-      String(title).trim(), description || null, legacyTargetType(targets), toJsonColumn(targets),
+      String(title), description || null, legacyTargetType(targets), toJsonColumn(targets),
       venue || null, schedule, event_date, start_time, end_time, end_at,
       st, st === 'published' ? new Date() : null, req.user.id, sendSms, showOnWebsite,
     ]
@@ -245,7 +248,9 @@ router.post('/', auth, adminOnly, idempotent(), wrap(async (req, res) => {
 
 // PUT /api/trainings/:id  (same fields as POST; business stays)
 router.put('/:id', auth, adminOnly, idempotent(), wrap(async (req, res) => {
-  const { title, description, venue, send_sms, status } = req.body || {};
+  const { venue, send_sms, status } = req.body || {};
+  const title = capitalizeFirst(String(req.body?.title ?? '').trim());
+  const description = req.body?.description ? capitalizeFirst(req.body.description) : null;
   const [rows] = await pool.query(
     'SELECT id, published_at, status, publish_status, show_on_website, target_beneficiary_types, target_type FROM trainings WHERE id = ?',
     [req.params.id]
@@ -274,7 +279,7 @@ router.put('/:id', auth, adminOnly, idempotent(), wrap(async (req, res) => {
        show_on_website = ?
      WHERE id = ?`,
     [
-      String(title || '').trim(), description || null, legacyTargetType(targets), toJsonColumn(targets),
+      String(title || ''), description || null, legacyTargetType(targets), toJsonColumn(targets),
       venue || null, schedule, event_date, start_time, end_time, end_at,
       rows[0].status, st, publishedAt, sendSms, showOnWebsite, req.params.id,
     ]

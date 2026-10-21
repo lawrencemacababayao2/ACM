@@ -3,6 +3,7 @@ import { pool } from '../config/db.js';
 import { auth, optionalAuth, adminOnly } from '../middleware/auth.js';
 import { idempotent } from '../middleware/idempotency.js';
 import { wrap, HttpError } from '../lib/utils.js';
+import { capitalizeFirst } from '../lib/text.js';
 
 const router = Router();
 
@@ -12,17 +13,21 @@ router.get('/', optionalAuth, wrap(async (req, res) => {
 }));
 
 router.post('/', auth, adminOnly, idempotent(), wrap(async (req, res) => {
-  const { question, answer, keywords } = req.body || {};
+  const { keywords } = req.body || {};
+  const question = capitalizeFirst(String(req.body?.question ?? '').trim());
+  const answer = capitalizeFirst(req.body?.answer ?? '');
   if (!question || !answer) throw new HttpError(400, 'Question and answer are required');
   const [r] = await pool.query(
     'INSERT INTO faqs (question, answer, keywords) VALUES (?, ?, ?)',
-    [question.trim(), answer, keywords || null]
+    [question, answer, keywords || null]
   );
   res.status(201).json({ id: r.insertId });
 }));
 
 router.put('/:id', auth, adminOnly, idempotent(), wrap(async (req, res) => {
-  const { question, answer, keywords } = req.body || {};
+  const { keywords } = req.body || {};
+  const question = capitalizeFirst(String(req.body?.question ?? '').trim());
+  const answer = capitalizeFirst(req.body?.answer ?? '');
   const [rows] = await pool.query('SELECT id FROM faqs WHERE id = ?', [req.params.id]);
   if (!rows[0]) throw new HttpError(404, 'FAQ not found');
   await pool.query(

@@ -3,6 +3,7 @@ import { pool } from '../config/db.js';
 import { auth, optionalAuth, adminOnly } from '../middleware/auth.js';
 import { idempotent } from '../middleware/idempotency.js';
 import { wrap, HttpError } from '../lib/utils.js';
+import { capitalizeFirst } from '../lib/text.js';
 
 const router = Router();
 
@@ -47,6 +48,29 @@ function cleanPoints(content) {
       ? { ...item, points: item.points.filter((p) => typeof p === 'string' ? p.trim() !== '' : (p.title || '').trim() !== '' || (p.desc || '').trim() !== '') }
       : item))
     : content;
+}
+
+// Capitalizes only the first letter of each display-text field. Keys, icons and
+// image URLs are left exactly as sent, and a value that starts with markup or a
+// link is untouched by capitalizeFirst.
+const TEXT_FIELDS = ['title', 'text', 'desc', 'description', 'short', 'intro', 'label'];
+
+function capitalizePoint(p) {
+  if (typeof p === 'string') return capitalizeFirst(p);
+  if (p && typeof p === 'object') {
+    return { ...p, title: capitalizeFirst(p.title), desc: capitalizeFirst(p.desc) };
+  }
+  return p;
+}
+
+function capitalizeItem(item) {
+  if (!item || typeof item !== 'object') return item;
+  const next = { ...item };
+  for (const f of TEXT_FIELDS) {
+    if (typeof next[f] === 'string') next[f] = capitalizeFirst(next[f]);
+  }
+  if (Array.isArray(next.points)) next.points = next.points.map(capitalizePoint);
+  return next;
 }
 
 function validateContent(key, content) {
@@ -129,12 +153,15 @@ router.put('/:key', auth, adminOnly, idempotent(), wrap(async (req, res) => {
        ON DUPLICATE KEY UPDATE heading = VALUES(heading), title = VALUES(title),
          address = VALUES(address), hours = VALUES(hours),
          phone = VALUES(phone), email = VALUES(email)`,
-      [content.heading, content.title, content.address, content.hours, content.phone, content.email]
+      [
+        capitalizeFirst(content.heading), capitalizeFirst(content.title), capitalizeFirst(content.address),
+        capitalizeFirst(content.hours), content.phone, content.email,
+      ]
     );
     return res.json({ ok: true });
   }
 
-  const cleaned = cleanPoints(content);
+  const cleaned = cleanPoints(content).map(capitalizeItem);
   validateContent(key, cleaned);
 
   const conn = await pool.getConnection();

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
+import { applyCapitalizeFirst, capitalizeFirst } from '../lib/text.js';
 import useOnlineStatus from '../hooks/useOnlineStatus.js';
 import useFormDraft from '../hooks/useFormDraft.js';
 import useFormSubmit from '../hooks/useFormSubmit.js';
@@ -194,6 +195,8 @@ const openEdit = (r) => {
   };
   const clearFieldError = (k) => setFormErrors((prev) => (prev && prev[k] ? { ...prev, [k]: undefined } : prev));
   const set = (k) => (e) => { setForm({ ...form, [k]: e.target.value }); clearFieldError(k); };
+  // Title and description are display text: capitalize only the first letter live.
+  const setText = (k) => (e) => { const v = applyCapitalizeFirst(e.target); setForm({ ...form, [k]: v }); clearFieldError(k); };
   const setFlag = (k) => (e) => setForm({ ...form, [k]: e.target.checked });
   // TypeMultiSelect hands back the whole array.
   const setTargets = (v) => { setForm({ ...form, target_beneficiary_types: v }); clearFieldError('target_beneficiary_types'); };
@@ -340,9 +343,9 @@ const submit = async (e) => {
     // Show on public website is automatic: true if 'public' is in targets AND published
     const showOnWebsite = status === 'published' && targets.includes('public');
     const payload = {
-      title: form.title,
-      description: form.description,
-      benefits: form.benefits.filter((b) => b.trim()),
+      title: capitalizeFirst(form.title.trim()),
+      description: capitalizeFirst(form.description),
+      benefits: form.benefits.filter((b) => b.trim()).map(capitalizeFirst),
       target_beneficiary_types: targets,
       venue: form.venue,
       schedule,
@@ -497,7 +500,7 @@ meta={filters.isFiltered
           columns={[
             { key: 'title', label: 'Title', render: (r) => (
               <span>
-                <strong>{r.title}</strong>
+                <strong>{capitalizeFirst(r.title)}</strong>
                 {r.status === 'draft' && <span className="draft-pill">Draft</span>}
               </span>
             ) },
@@ -549,11 +552,11 @@ meta={filters.isFiltered
           <DraftNotice savedAt={draft.savedAt} restoredAt={draft.restoredAt} onDiscard={() => { draft.clear(); setForm({ ...EMPTY, benefits: [] }); setFormErrors(null); }} />
           <FormError error={save.error} onRetry={() => { void submit(); }} />
           <Field label="Title" required error={Boolean(fieldError('title'))}>
-            <input value={form.title} onChange={set('title')} required />
+            <input value={form.title} onChange={setText('title')} onBlur={(e) => setForm({ ...form, title: capitalizeFirst(e.target.value.trim()) })} required />
             {fieldError('title') && <span className="error">{fieldError('title')}</span>}
           </Field>
           <Field label="Description" col2 error={Boolean(fieldError('description'))}>
-            <textarea value={form.description} onChange={set('description')} rows={3} autoCapitalize="sentences" />
+            <textarea value={form.description} onChange={setText('description')} onBlur={(e) => setForm({ ...form, description: capitalizeFirst(e.target.value) })} rows={3} />
             {fieldError('description') && <span className="error">{fieldError('description')}</span>}
           </Field>
 

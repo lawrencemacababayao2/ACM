@@ -7,6 +7,7 @@ import React, {
 } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "../api.js";
+import { applyCapitalizeFirst, capitalizeFirst } from "../lib/text.js";
 import useOnlineStatus from "../hooks/useOnlineStatus.js";
 import useFormDraft from "../hooks/useFormDraft.js";
 import useFormSubmit from "../hooks/useFormSubmit.js";
@@ -263,6 +264,12 @@ export default function Trainings() {
     setForm({ ...form, [k]: e.target.value });
     clearFieldError(k);
   };
+  // Title and description are display text: capitalize only the first letter live.
+  const setText = (k) => (e) => {
+    const v = applyCapitalizeFirst(e.target);
+    setForm({ ...form, [k]: v });
+    clearFieldError(k);
+  };
   const setFlag = (k) => (e) => setForm({ ...form, [k]: e.target.checked });
   // TypeMultiSelect hands back the whole array.
   const setTargets = (v) => {
@@ -432,9 +439,9 @@ export default function Trainings() {
     const smsBlocked = !targets.some((t) => t !== "public");
     const showOnWebsite = status === "published" && targets.includes("public");
     const payload = {
-      title: form.title,
-      description: form.description,
-      benefits: form.benefits.map((b) => b.trim()).filter((b) => b),
+      title: capitalizeFirst(form.title.trim()),
+      description: capitalizeFirst(form.description),
+      benefits: form.benefits.map((b) => b.trim()).filter((b) => b).map(capitalizeFirst),
       target_beneficiary_types: targets,
       venue: form.venue,
       schedule,
@@ -617,7 +624,7 @@ export default function Trainings() {
               label: "Title",
               render: (r) => (
                 <span>
-                  <strong>{r.title}</strong>
+                    <strong>{capitalizeFirst(r.title)}</strong>
                   {r.publish_status === "draft" && (
                     <span className="draft-pill">Draft</span>
                   )}
@@ -751,7 +758,7 @@ export default function Trainings() {
             }}
           />
           <Field label="Title" required error={Boolean(fieldError("title"))}>
-            <input value={form.title} onChange={set("title")} required />
+            <input value={form.title} onChange={setText("title")} onBlur={(e) => setForm({ ...form, title: capitalizeFirst(e.target.value.trim()) })} required />
             {fieldError("title") && (
               <span className="error">{fieldError("title")}</span>
             )}
@@ -763,9 +770,9 @@ export default function Trainings() {
           >
             <textarea
               value={form.description}
-              onChange={set("description")}
+              onChange={setText("description")}
+              onBlur={(e) => setForm({ ...form, description: capitalizeFirst(e.target.value) })}
               rows={3}
-              autoCapitalize="sentences"
             />
             {fieldError("description") && (
               <span className="error">{fieldError("description")}</span>

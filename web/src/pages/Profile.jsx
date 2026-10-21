@@ -12,6 +12,7 @@ import PageHeader from '../components/PageHeader.jsx';
 import { LoadingStatus, useSkeletonVisible } from '../components/Skeleton.jsx';
 import { useToast } from '../toast.jsx';
 import { passwordProblem, PASSWORD_MIN_LENGTH, PASSWORD_MAX_LENGTH } from '../lib/password.js';
+import { formatName, formatNameInput, nameProblem, displayName } from '../lib/name.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MOBILE_RE = /^09\d{9}$/;
@@ -31,7 +32,7 @@ const EDIT_FIELD_MAP = {
 const roleLabel = (v) => (v === 'super_admin' ? 'Superadmin' : v === 'admin' ? 'Admin' : v);
 
 const fullName = (u) =>
-  [u?.first_name, u?.middle_name, u?.last_name].filter(Boolean).join(' ') ||
+  [u?.first_name, u?.middle_name, u?.last_name].filter(Boolean).map(displayName).join(' ') ||
   u?.email ||
   'Account';
 
@@ -164,21 +165,43 @@ export default function Profile() {
     setDupErrors([]);
   };
 
+  const NAME_FIELD_LABELS = { first: 'First name', middle: 'Middle name', last: 'Last name' };
+
+  // Capitalize the name fields while typing, keeping the caret in place.
+  const setNameField = (k) => (e) => {
+    const input = e.target;
+    const caret = input.selectionStart;
+    const next = formatNameInput(input.value, MAX_NAME_LENGTH);
+    const delta = next.length - input.value.length;
+    setForm((f) => ({ ...f, [k]: next }));
+    setFieldErrors(null);
+    setDupErrors([]);
+    requestAnimationFrame(() => {
+      if (input.setSelectionRange) input.setSelectionRange(caret + delta, caret + delta);
+    });
+  };
+
+  const blurNameField = (k) => (e) => {
+    const next = formatNameInput(e.target.value, MAX_NAME_LENGTH);
+    setForm((f) => ({ ...f, [k]: next }));
+    const problem = nameProblem(next, { required: k !== 'middle', label: NAME_FIELD_LABELS[k], maxLength: MAX_NAME_LENGTH });
+    setFieldErrors((prev) => ({ ...(prev || {}), [k]: problem || undefined }));
+  };
+
   const submitAccount = async (e) => {
     if (e) e.preventDefault();
     if (!editing || save.busy) return;
 
-    const errors = {};
-    const first = form.first.trim();
-    const middle = form.middle.trim();
-    const last = form.last.trim();
-    if (!first) errors.first = 'First name is required';
-    if (!last) errors.last = 'Last name is required';
-    for (const [k, v] of Object.entries({ first, middle, last })) {
-      if (v.length > MAX_NAME_LENGTH) {
-        errors[k] = `Name parts must be ${MAX_NAME_LENGTH} characters or fewer`;
-      }
-    }
+  const errors = {};
+  const first = formatName(form.first);
+  const middle = formatName(form.middle);
+  const last = formatName(form.last);
+  const firstProblem = nameProblem(first, { required: true, label: 'First name', maxLength: MAX_NAME_LENGTH });
+  if (firstProblem) errors.first = firstProblem;
+  const middleProblem = nameProblem(middle, { required: false, label: 'Middle name', maxLength: MAX_NAME_LENGTH });
+  if (middleProblem) errors.middle = middleProblem;
+  const lastProblem = nameProblem(last, { required: true, label: 'Last name', maxLength: MAX_NAME_LENGTH });
+  if (lastProblem) errors.last = lastProblem;
     const email = form.email.trim().toLowerCase();
     if (email && !EMAIL_RE.test(email)) errors.email = 'Enter a valid email address';
     const mobile = form.mobile.replace(/\D/g, '');
@@ -473,7 +496,8 @@ export default function Profile() {
                 <input
                   id="pf-first"
                   value={form.first}
-                  onChange={setFormField('first')}
+                  onChange={setNameField('first')}
+                  onBlur={blurNameField('first')}
                   disabled={!editing}
                   required
                   maxLength={MAX_NAME_LENGTH}
@@ -489,7 +513,8 @@ export default function Profile() {
                 <input
                   id="pf-middle"
                   value={form.middle}
-                  onChange={setFormField('middle')}
+                  onChange={setNameField('middle')}
+                  onBlur={blurNameField('middle')}
                   disabled={!editing}
                   maxLength={MAX_NAME_LENGTH}
                   autoComplete="additional-name"
@@ -503,7 +528,8 @@ export default function Profile() {
                 <input
                   id="pf-last"
                   value={form.last}
-                  onChange={setFormField('last')}
+                  onChange={setNameField('last')}
+                  onBlur={blurNameField('last')}
                   disabled={!editing}
                   required
                   maxLength={MAX_NAME_LENGTH}
