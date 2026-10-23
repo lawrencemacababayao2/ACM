@@ -134,7 +134,8 @@ const HOST = process.env.HOST || '0.0.0.0';
 app.listen(PORT, HOST, async () => {
   console.log(`AgriConnect Medina API running on http://${HOST}:${PORT}`);
   // A deploy does not run server/migrations/*.sql, so a database that predates a
-  // column would only fail later, mid-request. Self-heal the ones the code needs.
+  // column (or a seeded knowledge-base row) would only fail later, mid-request.
+  // Self-heal the ones the code needs.
   try {
     await ensureSchema();
   } catch (err) {

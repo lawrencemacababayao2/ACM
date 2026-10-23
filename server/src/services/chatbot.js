@@ -233,10 +233,14 @@ async function buildSystemContext(scope, message, replyLang) {
   const landingInfo = await loadLandingInfo();
   const advisories = await loadAdvisories(scope);
   const ownRequests = scope && scope.userId ? await loadOwnRequests(scope.userId) : [];
-  let topFaqs = faqs;
-  if (faqs.length > 15) {
-    const ranked = rankFaqs(message, faqs).slice(0, 8);
-    topFaqs = ranked.length ? ranked : faqs.slice(0, 8);
+  // Registration-requirement FAQs get their own authoritative section below, so
+  // they are never lost to the top-FAQ ranking and are not printed twice.
+  const requirementFaqs = faqs.filter(isRequirementFaq);
+  const generalFaqs = faqs.filter((f) => !isRequirementFaq(f));
+  let topFaqs = generalFaqs;
+  if (generalFaqs.length > 15) {
+    const ranked = rankFaqs(message, generalFaqs).slice(0, 8);
+    topFaqs = ranked.length ? ranked : generalFaqs.slice(0, 8);
   }
   const today = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Asia/Manila',
@@ -267,9 +271,10 @@ async function buildSystemContext(scope, message, replyLang) {
   '- If asked who you are, say you are ACM Assistant, the AgriConnect Medina assistant that\n' +
   '  helps Medina constituents with MAO information, services, advisories and activities.\n' +
   '- Answer ONLY using the official information provided below.\n' +
-  '- The ADVISORIES, PROGRAMS, TRAININGS and REQUEST CATALOG sections are the\n' +
-  '  COMPLETE and AUTHORITATIVE lists. Never name an advisory, program, training, service,\n' +
-  '  benefit, requirement, schedule or date that is not explicitly written in them.\n' +
+  '- The ADVISORIES, PROGRAMS, TRAININGS, REQUEST CATALOG and BENEFICIARY REGISTRATION\n' +
+  '  REQUIREMENTS sections are the COMPLETE and AUTHORITATIVE lists. Never name an\n' +
+  '  advisory, program, training, service, benefit, requirement, schedule or date that is\n' +
+  '  not explicitly written in them.\n' +
   '- If a section is missing or empty, say plainly that nothing is available for that\n' +
   '  right now and suggest contacting the MAO office. Never invent items to fill the gap\n' +
   '  and never fall back on general knowledge about other agriculture offices.\n' +
@@ -303,6 +308,25 @@ async function buildSystemContext(scope, message, replyLang) {
   '  them an authorized account is required.\n' +
   '- Never reveal passwords, login or API tokens, secret keys or any credentials, and never\n' +
   '  help bypass, hack or access someone else\'s account.\n\n' +
+
+  'BENEFICIARY REGISTRATION REQUIREMENTS:\n' +
+  '- When someone asks what is required to register as a beneficiary, what documents to\n' +
+  '  prepare or what to bring, answer from the BENEFICIARY REGISTRATION REQUIREMENTS\n' +
+  '  section below. Those requirements are official: never say they are unavailable, and\n' +
+  '  never send the person to the office instead of listing them.\n' +
+  '- If the beneficiary type is not stated, ask this first and stop, in the language they\n' +
+  '  used: "What type of beneficiary are you registering as: Farmer, Livestock Owner,\n' +
+  '  Fisherfolk, or Coconut Farmer?"\n' +
+  '- Once the type is known, from this message or earlier in the conversation, give ONLY\n' +
+  '  that type\'s requirements. Never mix documents between beneficiary types.\n' +
+  '- Farmer, Livestock Owner and Fisherfolk each require a valid ID photocopy with three\n' +
+  '  (3) specimen signatures and one (1) 2x2 ID picture. Coconut Farmer requires a tax\n' +
+  '  declaration or deed of sale and a valid ID with three (3) specimen signatures; the\n' +
+  '  2x2 ID picture is NOT part of the Coconut Farmer requirements.\n' +
+  '- Do not invent requirements, fees, deadlines, eligibility rules or processing times.\n' +
+  '  If such a detail is asked and is not written below, say plainly that it is not in the\n' +
+  '  current knowledge base and tell the person to confirm it with the MAO office.\n' +
+  '- Present the requirements as a numbered list, one short sentence per item.\n\n' +
 
   'LANGUAGE:\n' +
   `- Default to ${replyLang}, the language the person wrote in.\n` +
@@ -412,6 +436,10 @@ async function buildSystemContext(scope, message, replyLang) {
     s += '=== OFFICIAL FAQS ===\n' +
       topFaqs.map(f => `Q: ${f.question}\nA: ${f.answer}`).join('\n\n') + '\n\n';
   }
+  if (requirementFaqs.length) {
+    s += '=== BENEFICIARY REGISTRATION REQUIREMENTS (official) ===\n' +
+      requirementFaqs.map(f => `Q: ${f.question}\nA: ${f.answer}`).join('\n\n') + '\n\n';
+  }
   if (programs.length) {
     s += (pastIntent ? '=== PROGRAMS (most recent first) ===\n' : '=== ACTIVE PROGRAMS ===\n') +
       programs
@@ -510,7 +538,110 @@ function truncateAnswer(text, max, replyLang) {
   return `${head}\u2026\n\n${cutNote(replyLang)}`;
 }
 
-function faqFallback(message, scope, lang) {
+// ---------------------------------------------------------------
+// Beneficiary registration requirements
+//
+// The faqs table stays the single source of truth: rows tagged with a
+// `acm-req:<type>` marker are rendered into the prompt's authoritative
+// requirements section. The templates below mirror those same rows for the
+// keyword fallback, where the reply must be produced in the visitor's language
+// without calling a model. scripts/chatbot-requirements-check.mjs fails if the
+// table rows and these templates ever drift apart.
+// ---------------------------------------------------------------
+
+const REQUIREMENT_MARKER = 'acm-req:';
+
+function isRequirementFaq(faq) {
+  return String((faq && faq.keywords) || '').toLowerCase().includes(REQUIREMENT_MARKER);
+}
+
+const REGISTRATION_TYPES = [
+  { key: 'coconut', label: 'Coconut Farmer', re: /\b(coconut|coconuts|copra|niyog|lubi)\b/i },
+  { key: 'fisherfolk', label: 'Fisherfolk', re: /\b(fisher|fishers|fisherfolk|fisherman|fishermen|mangingisda|mananagat|pangisda)\b/i },
+  { key: 'livestock', label: 'Livestock Owner', re: /\b(livestock|livestocks|poultry|animal|animals|hayop|kahayupan|mananap|baboy|baka|kanding|manok)\b/i },
+  { key: 'farmer', label: 'Farmer', re: /\b(farmer|farmers|magsasaka|mag-uuma)\b/i },
+];
+
+const REGISTRATION_MENTION =
+  /\b(register|registration|registering|registered|beneficiar(?:y|ies)|rsbsa|magparehistro|magpatala|patala|rehistro)\b/i;
+const REGISTRATION_DOCUMENT_MENTION =
+  /\b(requirements?|documents?|documento|dokumento|papers?|needed|need|bring|dad-?on|dalhin|prepare|ihanda|kinahanglan|kailangan|valid\s+id)\b/i;
+const PROGRAM_ASSISTANCE_MENTION =
+  /\b(financial assistance|assistance|subsid(?:y|ies)|insurance|loan|fuel|seedlings?|seeds?|fertilizer|tractor|machinery|equipment)\b/i;
+const UNLISTED_DETAIL_MENTION =
+  /\b(fees?|bayad|magkano|singil|cost|payment|deadlines?|processing(?:\s+time)?|how\s+long|gaano\s+katagal|pila\s+ka\s+adlaw|pila\s+ka\s+oras|eligib(?:le|ility)|qualif(?:ied|ication))\b/i;
+
+const STANDARD_REGISTRATION_DOCS = {
+  en: '1. Valid ID \u2014 photocopy with three (3) specimen signatures.\n2. One (1) 2x2 ID picture.',
+  bis: '1. Valid ID \u2014 photocopy nga adunay tulo (3) ka specimen signatures.\n2. Usa (1) ka 2x2 ID picture.',
+  tl: '1. Valid ID \u2014 photocopy na may tatlong (3) specimen signatures.\n2. Isang (1) 2x2 ID picture.',
+};
+
+const REGISTRATION_DOCS = {
+  farmer: STANDARD_REGISTRATION_DOCS,
+  livestock: STANDARD_REGISTRATION_DOCS,
+  fisherfolk: STANDARD_REGISTRATION_DOCS,
+  coconut: {
+    en: '1. Tax declaration or deed of sale.\n2. Valid ID with three (3) specimen signatures.',
+    bis: '1. Tax declaration o deed of sale.\n2. Valid ID nga adunay tulo (3) ka specimen signatures.',
+    tl: '1. Tax declaration o deed of sale.\n2. Valid ID na may tatlong (3) specimen signatures.',
+  },
+};
+
+const REGISTRATION_REPLY = {
+  en: {
+    clarify: 'What type of beneficiary are you registering as: Farmer, Livestock Owner, Fisherfolk, or Coconut Farmer?',
+    intro: (label) => `For ${label} (RSBSA) registration, prepare the following:`,
+    unlisted: (contact) => `That detail is not in the current knowledge base. Please confirm it with the Municipal Agriculture Office of Medina, ${contact}.`,
+  },
+  bis: {
+    clarify: 'Unsang klase sa beneficiary imong i-register: Farmer, Livestock Owner, Fisherfolk, o Coconut Farmer?',
+    intro: (label) => `Para sa ${label} (RSBSA) registration, mao ni ang mga requirements:`,
+    unlisted: (contact) => `Wala sa kasamtangang knowledge base ang maong detalye. Palihug kumpirmaha kini sa Municipal Agriculture Office of Medina, ${contact}.`,
+  },
+  tl: {
+    clarify: 'Anong uri ng beneficiary ang ire-register mo: Farmer, Livestock Owner, Fisherfolk, o Coconut Farmer?',
+    intro: (label) => `Para sa ${label} (RSBSA) registration, ihanda ang mga sumusunod:`,
+    unlisted: (contact) => `Wala sa kasalukuyang knowledge base ang partikular na detalyeng iyan. Pakikumpirma ito sa Municipal Agriculture Office of Medina, ${contact}.`,
+  },
+};
+
+function registrationLangKey(replyLang) {
+  if (replyLang === 'Bisaya (Cebuano)') return 'bis';
+  if (replyLang === 'Tagalog (Filipino)') return 'tl';
+  return 'en';
+}
+
+function detectRegistrationType(text) {
+  const value = String(text || '');
+  for (const entry of REGISTRATION_TYPES) {
+    if (entry.re.test(value)) return entry.key;
+  }
+  return null;
+}
+
+function registrationLabel(typeKey) {
+  const found = REGISTRATION_TYPES.find((t) => t.key === typeKey);
+  return found ? found.label : 'Beneficiary';
+}
+
+function isRegistrationDocumentRequest(text) {
+  const value = String(text || '');
+  if (!REGISTRATION_DOCUMENT_MENTION.test(value)) return false;
+  return REGISTRATION_MENTION.test(value) || detectRegistrationType(value) !== null;
+}
+
+// Only the visitor's own words count, so the assistant's clarifying question
+// ("Farmer, Livestock Owner, ...?") can never be mistaken for a chosen type.
+function userHistoryText(history) {
+  if (!Array.isArray(history)) return '';
+  return history
+    .filter((h) => h && h.role === 'user' && typeof h.content === 'string')
+    .map((h) => h.content)
+    .join(' ');
+}
+
+export function faqFallback(message, scope, lang, history = []) {
   return new Promise((resolve) => {
     const tokens = meaningfulTokens(message);
     const replyLang = replyLanguage(message, lang);
@@ -541,6 +672,31 @@ function faqFallback(message, scope, lang) {
             'You have no requests on file yet. To send one, open the AgriConnect Medina app, tap the + button, choose what you need and submit the form.',
             'DB'
           );
+        }
+
+        // Official beneficiary registration requirements. Runs before the FAQ
+        // matcher so the per-type answer (or the clarifying question) always
+        // wins over a partial keyword hit, but yields to program-specific
+        // questions such as "financial assistance" which have their own FAQ.
+        const historyText = userHistoryText(history);
+        const registrationType = detectRegistrationType(message) || detectRegistrationType(historyText);
+        const registrationIntent = !PROGRAM_ASSISTANCE_MENTION.test(lower) &&
+          (isRegistrationDocumentRequest(message) ||
+            (registrationType !== null && isRegistrationDocumentRequest(historyText)));
+
+        if (registrationIntent) {
+          const langKey = registrationLangKey(replyLang);
+          const strings = REGISTRATION_REPLY[langKey];
+          let text = registrationType
+            ? `${strings.intro(registrationLabel(registrationType))}\n\n${REGISTRATION_DOCS[registrationType][langKey]}`
+            : strings.clarify;
+          if (UNLISTED_DETAIL_MENTION.test(lower)) text += `\n\n${strings.unlisted(await contactLine())}`;
+          return done(text, 'FAQ');
+        }
+
+        if (UNLISTED_DETAIL_MENTION.test(lower) &&
+            (REGISTRATION_MENTION.test(lower) || registrationType !== null)) {
+          return done(REGISTRATION_REPLY[registrationLangKey(replyLang)].unlisted(await contactLine()), 'FAQ');
         }
 
         // Direct DB-backed answers (work without the LLM / FAQ)
@@ -588,11 +744,16 @@ const list = rows.map((t, i) => {
           }
         }
 
-        // Fall back to FAQ keyword matching
+        // Fall back to FAQ keyword matching. Program-specific questions (financial
+        // assistance, subsidies, loans...) must never be answered with the generic
+        // registration requirements, so those rows are left out of the matching.
         const [rows] = await pool.query('SELECT question, answer, keywords FROM faqs');
+        const candidateFaqs = PROGRAM_ASSISTANCE_MENTION.test(lower)
+          ? rows.filter((f) => !isRequirementFaq(f))
+          : rows;
         let best = null;
         let bestScore = 0;
-        for (const f of rows) {
+        for (const f of candidateFaqs) {
           const hay = `${f.question} ${f.keywords || ''}`.toLowerCase();
           let score = 0;
           for (const t of tokens) if (hay.includes(t)) score += 1;
@@ -691,7 +852,7 @@ export async function answer(message, lang, scope, history = []) {
 
   if (!apiKey) {
     console.warn('[chatbot] fallback reason=no_api_key');
-    return faqFallback(message, scope, lang);
+    return faqFallback(message, scope, lang, history);
   }
 
   try {
@@ -721,13 +882,13 @@ export async function answer(message, lang, scope, history = []) {
     });
     if (!res.ok) {
       console.warn(`[chatbot] fallback reason=http_${res.status}`);
-      return faqFallback(message, scope, lang);
+      return faqFallback(message, scope, lang, history);
     }
     const data = await res.json();
     const content = data?.choices?.[0]?.message?.content;
     if (!content) {
       console.warn('[chatbot] fallback reason=empty_content');
-      return faqFallback(message, scope, lang);
+      return faqFallback(message, scope, lang, history);
     }
     const trimmed = truncateAnswer(content, rateLimits.llm.maxOutputChars, replyLang);
     const tokens = Number(data?.usage?.total_tokens) || 0;
@@ -735,6 +896,6 @@ export async function answer(message, lang, scope, history = []) {
     return { answer: trimmed, source: 'AI', tokens };
   } catch (err) {
     console.warn(`[chatbot] fallback reason=${err?.name || 'Error'}`);
-    return faqFallback(message, scope, lang);
+    return faqFallback(message, scope, lang, history);
   }
 }
