@@ -39,9 +39,10 @@ export function scheduleToFields(r) {
 // default to 11:59 PM), we never fabricate a time for it.
 export function fieldsToSchedule(f) {
   const schedule = f.date_from && f.time_from ? `${f.date_from}T${f.time_from}` : '';
+  const endDate = f.date_to || f.date_from;
   const hasEnd = Boolean(f.date_to || f.time_to);
-  const end_at = hasEnd && (f.date_to || f.date_from) && (f.time_to || f.time_from)
-    ? `${f.date_to || f.date_from}T${f.time_to || f.time_from}`
+  const end_at = hasEnd && endDate && f.time_to
+    ? `${endDate}T${f.time_to}`
     : '';
   return { schedule, end_at };
 }
@@ -50,15 +51,16 @@ export function validateScheduleFields(f) {
   const any = f.date_from || f.time_from || f.date_to || f.time_to;
   if (!any) return null;
   if (!f.date_from || !f.time_from) return 'Pick both a start date and a start time, or leave the whole schedule blank.';
-  if ((f.date_to && !f.time_to) || (f.time_to && !f.date_to)) return 'Pick both an end date and an end time, or leave the end blank.';
+  if (f.date_to && !f.time_to) return 'Pick both an end date and an end time, or leave the end blank.';
   const s = parseLocal(`${f.date_from}T${f.time_from}`);
   if (!s) return 'Schedule must be a valid date and time';
   if (s.y < 2000 || s.y > 2100) return 'Schedule year must be between 2000 and 2100';
-  if (f.date_to && f.time_to) {
-    const e = parseLocal(`${f.date_to}T${f.time_to}`);
+  if (f.time_to) {
+    const eDate = f.date_to || f.date_from;
+    const e = parseLocal(`${eDate}T${f.time_to}`);
     if (!e) return 'End must be a valid date and time';
     if (e.y < 2000 || e.y > 2100) return 'End year must be between 2000 and 2100';
-    if (epoch(e) <= epoch(s)) return 'End must be after the start.';
+    if (epoch(e) <= epoch(s)) return 'End time must be later than the start time';
   }
   return null;
 }

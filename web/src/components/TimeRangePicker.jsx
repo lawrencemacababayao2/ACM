@@ -3,32 +3,18 @@ import { createPortal } from 'react-dom';
 import Icon from './Icon.jsx';
 import TimeWheel, { formatWheelTime } from './TimeWheel.jsx';
 import { useDismissOnOutside, usePopoverPlacement } from './usePopover.js';
+import { formatTime12, parseTime24 } from '../lib/dateUtils.js';
+
+function parseHm(v) {
+  const p = parseTime24(v);
+  if (!p) return null;
+  return { h: p.h, m: p.m, min: p.h * 60 + p.m };
+}
 
 /**
  * Start/end time range for the trainings & seminars form.
- *
- * Replaces a free-text field that used to hold whatever someone typed, e.g.
- * "8:00 AM - 5:00 PM", "8am-5pm", or "morning". Only two shapes are storable now
- * (two TIME columns) and the API rejects a start without an end or an end before
- * the start, so the control has to make both ends explicit.
- *
- * One trigger shows the whole range rather than two separate fields, because the
- * value is conceptually one schedule: splitting it across two inputs in a form
- * row that already holds Date and End time left no room without wrapping. The popover
- * edits whichever end is selected, and switching between them keeps the time that
- * was already chosen for the other.
- *
- * Values are 'HH:MM' 24-hour strings, matching what the API stores.
- *
- * The popover is portalled to <body>, like FilterPill's menu. Two reasons, both
- * of which were bugs before it moved: anchored inside the form it was clipped by
- * the scrolling .modal-body, and it sat inside the <label> that Field renders,
- * whose activation behaviour forwards a click on non-interactive content -- the
- * popover's own padding, the "Hour" and "Minute" captions, the footer hint -- to
- * the first labelable descendant, which is the trigger. That reopened the
- * trigger's onClick and closed the picker mid-interaction.
  */
-export default function TimeRangePicker({ start, end, onChange, ariaLabel = 'Time range', id }) {
+export default function TimeRangePicker({ start, end, onChange, ariaLabel = 'Time range', id, dateFrom = '', dateTo = '' }) {
   const [open, setOpen] = useState(false);
   const [target, setTarget] = useState('start');
   const ref = useRef(null);
@@ -39,35 +25,38 @@ export default function TimeRangePicker({ start, end, onChange, ariaLabel = 'Tim
   useDismissOnOutside(open, ref, close, popRef);
   const pos = usePopoverPlacement(open, triggerRef, popRef);
 
+  const endDateEff = dateTo || dateFrom;
+  const endLaterDay = Boolean(dateFrom && endDateEff && endDateEff > dateFrom);
+
+  const startP = parseHm(start);
+  const endP = parseHm(end);
+
+  const requiredInvalid = Boolean(startP && endP && !endLaterDay && endP.min <= startP.min);
+  const invalid = requiredInvalid;
+
   const setEnd = (nextStart, nextEnd) => {
     onChange?.({ start: nextStart, end: nextEnd });
   };
 
-  // Editing the start of a range whose end already sits earlier would silently
-  // create an invalid one, so the old end is dropped rather than kept. The user
-  // then sets the end again and sees the new value in the footer.
   const setStart = (nextStart) => {
-    const startParts = nextStart.split(':').map(Number);
-    const endParts = (end || '').split(':').map(Number);
-    const endIsEarlier = end
-      && (endParts[0] < startParts[0] || (endParts[0] === startParts[0] && endParts[1] <= startParts[1]));
-    setEnd(nextStart, endIsEarlier ? '' : end);
+    const sp = parseHm(nextStart);
+    const ep = parseHm(end);
+    const wouldInvalidate = sp && ep && !endLaterDay && ep.min <= sp.min;
+    setEnd(nextStart, wouldInvalidate ? '' : end);
   };
 
   const setStop = (nextEnd) => {
-    const startParts = (start || '').split(':').map(Number);
-    const endParts = nextEnd.split(':').map(Number);
-    // Refuse to store an end at or before the start: the server rejects it anyway,
-    // and silently dropping the keystroke would look like the picker is broken.
     if (!start) return;
-    if (endParts[0] < startParts[0] || (endParts[0] === startParts[0] && endParts[1] <= startParts[1])) return;
+    const sp = parseHm(start);
+    const ep = parseHm(nextEnd);
+    if (!sp || !ep) return;
+    if (!endLaterDay && ep.min <= sp.min) return;
     setEnd(start, nextEnd);
   };
 
   const active = target === 'start' ? start : end;
   const onActiveChange = target === 'start' ? setStart : setStop;
 
-  // A record can change underneath the form, e.g. Edit on another row.
   useEffect(() => { if (!open) setTarget('start'); }, [open]);
 
   const from = formatWheelTime(start);
@@ -75,20 +64,121 @@ export default function TimeRangePicker({ start, end, onChange, ariaLabel = 'Tim
   const label = from && to ? `${from} – ${to}` : from || to || 'Select time range';
   const incomplete = Boolean(from) !== Boolean(to);
 
+  const [helperState, setHelperState] = useState({ msg: '', error: false, shake: false, hasDisabled: false, startLabel: '' });
+  const [suggest, setSuggest] = useState(null);
+  const helperTimer = useRef(null);
+  const pulsed = useRef(false);
+  const endAutoDefaulted = useRef(false);
+
+  const triggerFlash = useCallback((isErr) => {
+    setHelperState((s) => ({ ...s, error: !!isErr, shake: !!isErr }));
+    if (helperTimer.current) clearTimeout(helperTimer.current);
+    if (isErr) {
+      helperTimer.current = setTimeout(() => setHelperState((s) => ({ ...s, shake: false })), 600);
+      helperTimer.current = setTimeout(() => setHelperState((s) => ({ ...s, error: false })), 600);
+    }
+  }, []);
+
+  const formatStart = () => {
+    if (!startP) return '';
+    return formatTime12(startP.h, startP.m);
+  };
+
+  // auto-switch to PM if whole AM disabled
+  useEffect(() => {
+    if (!open || target !== 'end' || !startP || endLaterDay) return;
+    let anyAmValid = false;
+    for (let h12 = 1; h12 <= 12; h12++) {
+      const h24 = h12 % 12;
+      if (h24 * 60 + 0 > startP.min) { anyAmValid = true; break; }
+    }
+    if (!anyAmValid) {
+      for (let h12 = 1; h12 <= 12; h12++) {
+        const h24 = h12 % 12 + 12;
+        for (let mi = 0; mi < 60; mi += 5) {
+          if (h24 * 60 + mi > startP.min) {
+            setEnd(start, `${String(h24).padStart(2,'0')}:${String(mi).padStart(2,'0')}`);
+            break;
+          }
+        }
+        break;
+      }
+    }
+  }, [open, target, startP, endLaterDay, start]); // eslint-disable-line
+
+  // smart default
+  useEffect(() => {
+    if (open && target === 'end' && startP && !endLaterDay && !endP && !endAutoDefaulted.current) {
+      for (let h24 = 0; h24 < 24; h24++) {
+        for (let mi = 0; mi < 60; mi += 5) {
+          if (h24 * 60 + mi > startP.min) {
+            setEnd(start, `${String(h24).padStart(2,'0')}:${String(mi).padStart(2,'0')}`);
+            endAutoDefaulted.current = true;
+            return;
+          }
+        }
+      }
+      endAutoDefaulted.current = true;
+    }
+    if (!open) { endAutoDefaulted.current = false; }
+  }, [open, target, startP, endLaterDay, endP, start]); // eslint-disable-line
+
+  useEffect(() => {
+    if (!open) {
+      pulsed.current = false;
+      setSuggest(null);
+      setHelperState({ msg: '', error: false, shake: false, hasDisabled: false, startLabel: '' });
+    }
+  }, [open]);
+
+  const handleDisabledClick = useCallback((h24) => {
+    if (target !== 'end' || !startP || endLaterDay) return;
+    const clickedIsPm = h24 >= 12;
+    const otherH24 = clickedIsPm ? (h24 % 12) : h24 + 12;
+    let validInOther = false;
+    for (let mi = 0; mi < 60; mi += 5) {
+      if (otherH24 * 60 + mi > startP.min) { validInOther = true; break; }
+    }
+    if (validInOther && !pulsed.current) {
+      pulsed.current = true;
+      setSuggest({ h12: otherH24 % 12 === 0 ? 12 : otherH24 % 12, ampm: otherH24 >= 12 ? 'PM' : 'AM', h24: otherH24 });
+    }
+    triggerFlash(true);
+    setTimeout(() => triggerFlash(false), 600);
+  }, [target, startP, endLaterDay, triggerFlash]);
+
+  const applySuggest = () => {
+    if (!suggest || !startP) return;
+    for (let mi = 0; mi < 60; mi += 5) {
+      if (suggest.h24 * 60 + mi > startP.min) {
+        setEnd(start, `${String(suggest.h24).padStart(2,'0')}:${String(mi).padStart(2,'0')}`);
+        setTarget('end');
+        setSuggest(null);
+        pulsed.current = false;
+        break;
+      }
+    }
+  };
+
+  const showPanel = target === 'end' && startP && !endLaterDay && (helperState.hasDisabled || helperState.error);
+  const panelMsg = helperState.error ? `End time must be later than ${helperState.startLabel || formatStart()}.` : `Pick an end time later than ${helperState.startLabel || formatStart()}.`;
+
   return (
     <div className="filter-pill time-range-picker" ref={ref}>
       <button
         type="button"
         id={id}
         ref={triggerRef}
-        className="filter-pill-btn is-field"
+        className={`filter-pill-btn is-field${invalid ? ' is-invalid' : ''}`}
         aria-label={ariaLabel}
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
-        <Icon name="calendar" size={15} />
-        <span className={`filter-pill-label ${from ? '' : 'is-placeholder'}`}>{label}</span>
+        <Icon name="clock" size={15} />
+        <span className={`filter-pill-label ${from ? '' : 'is-placeholder'}${invalid ? ' is-invalid-text' : ''}`}>
+          {invalid ? 'End time must be later than the start time.' : label}
+        </span>
         <Icon name="chevron-down" size={14} className="filter-pill-chevron" />
       </button>
 
@@ -101,25 +191,44 @@ export default function TimeRangePicker({ start, end, onChange, ariaLabel = 'Tim
           style={pos ? { top: pos.top, left: pos.left } : { visibility: 'hidden' }}
         >
           <div className="time-range-seg" role="group" aria-label="Which end of the range">
-            <button type="button" className={target === 'start' ? 'is-on' : ''} aria-pressed={target === 'start'} onClick={() => setTarget('start')}>
+            <button type="button" className={target === 'start' ? 'is-on' : ''} aria-pressed={target === 'start'} onClick={() => { setTarget('start'); setSuggest(null); }}>
               Start{from ? ` · ${from}` : ''}
             </button>
-            <button type="button" className={target === 'end' ? 'is-on' : ''} aria-pressed={target === 'end'} onClick={() => setTarget('end')}>
+            <button type="button" className={target === 'end' ? 'is-on' : ''} aria-pressed={target === 'end'} onClick={() => { setTarget('end'); }}>
               End{to ? ` · ${to}` : ''}
             </button>
           </div>
 
-          <TimeWheel value={active} onChange={onActiveChange} label={target === 'start' ? 'Start time' : 'End time'} />
+          {showPanel && (
+            <div className={`time-range-helper${helperState.error ? ' is-error' : ' is-hint'}${helperState.shake ? ' is-shake' : ''}`}>
+              <Icon name="info" size={14} />
+              <span>
+                {panelMsg}
+              </span>
+            </div>
+          )}
+
+          <TimeWheel
+            value={active}
+            onChange={onActiveChange}
+            label={target === 'start' ? 'Start time' : 'End time'}
+            isEnd={target === 'end'}
+            rangeStartTime={start || ''}
+            rangeStartDate={dateFrom || ''}
+            rangeEndDate={endDateEff || dateFrom || ''}
+            onDisabledClick={handleDisabledClick}
+            onValidityChange={(v) => setHelperState((s) => ({ ...s, hasDisabled: v.hasDisabled, startLabel: v.startLabel }))}
+          />
 
           <div className="date-picker-foot">
-            <span className="date-picker-hint">
-              {incomplete ? 'Set both a start and an end' : label}
+            <span className={`date-picker-hint${requiredInvalid ? ' is-invalid-text' : ''}`}>
+              {requiredInvalid ? 'End time must be later than the start time.' : (incomplete ? 'Set both a start and an end' : label)}
             </span>
             <span className="date-picker-foot-actions">
               <button
                 type="button"
                 className="date-picker-clear"
-                onClick={() => { setEnd('', ''); setOpen(false); }}
+                onClick={() => { setEnd('', ''); setOpen(false); setSuggest(null); setHelperState({ msg: '', error: false, shake: false, hasDisabled: false, startLabel: '' }); }}
               >
                 Clear
               </button>

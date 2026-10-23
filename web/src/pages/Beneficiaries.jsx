@@ -1429,6 +1429,7 @@ const setStatusOf = async (beneficiary, nextStatus) => {
                     onBlur={() => setPasswordFocused(false)}
                     invalid={Boolean(editErrors.password)}
                     placeholder="Enter a password"
+                    autoComplete="new-password"
                   />
                   {(passwordFocused || editErrors.password) && <PasswordChecklist value={editForm.password} />}
                   {editErrors.password && <span className="error">{editErrors.password}</span>}
@@ -1438,6 +1439,7 @@ const setStatusOf = async (beneficiary, nextStatus) => {
                     value={editForm.password_confirmation}
                     onChange={(e) => setEditValue('password_confirmation', e.target.value)}
                     placeholder="Re-enter the password"
+                    autoComplete="new-password"
                   />
                   {editErrors.password_confirmation && <span className="error">{editErrors.password_confirmation}</span>}
                 </Field>
@@ -1484,6 +1486,7 @@ const setStatusOf = async (beneficiary, nextStatus) => {
                 onBlur={() => setResetFocused(false)}
                 invalid={Boolean(resetErrors.password)}
                 placeholder="Enter a password"
+                autoComplete="new-password"
               />
               {(resetFocused || resetErrors.password) && <PasswordChecklist value={resetForm.password} />}
               {resetErrors.password && <span className="error">{resetErrors.password}</span>}
@@ -1493,6 +1496,7 @@ const setStatusOf = async (beneficiary, nextStatus) => {
                 value={resetForm.password_confirmation}
                 onChange={(e) => { setResetForm((p) => ({ ...p, password_confirmation: e.target.value })); setResetErrors((p) => ({ ...p, password_confirmation: undefined })); }}
                 placeholder="Re-enter the password"
+                autoComplete="new-password"
               />
               {resetErrors.password_confirmation && <span className="error">{resetErrors.password_confirmation}</span>}
             </Field>

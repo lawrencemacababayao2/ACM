@@ -19,6 +19,7 @@ export default function PasswordInput({
   return (
     <div className="password-input">
       <input
+        {...rest}
         type={revealed ? 'text' : 'password'}
         value={value}
         onChange={onChange}
@@ -28,10 +29,13 @@ export default function PasswordInput({
         autoComplete={autoComplete}
         maxLength={PASSWORD_MAX_LENGTH}
         aria-invalid={invalid || undefined}
-        {...rest}
         autoCapitalize="none"
         autoCorrect="off"
         spellCheck={false}
+        inputMode="text"
+        style={{ textTransform: 'none', WebkitTextTransform: 'none', ...(rest.style || {}) }}
+        data-no-format="true"
+        data-sensitive="true"
       />
       <button
         type="button"

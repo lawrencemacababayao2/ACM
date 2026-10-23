@@ -1887,3 +1887,48 @@ a.dash-kpi:focus-visible { outline: 2px solid var(--green); outline-offset: 2px;
   .pf-name { font-size: 17.5px; }
   .pf-photo-actions .btn { flex: 1; }
 }
+
+
+/* Time range picker enhancements */
+.time-range-helper {
+  display: flex; align-items: flex-start; gap: 6px;
+  margin: 6px 10px 0; padding: 6px 8px;
+  background: var(--bg); border-radius: 8px;
+  font-size: 11.5px; color: var(--muted);
+}
+.time-range-helper svg { flex: none; margin-top: 1px; }
+.time-range-helper.is-error { color: var(--danger); background: var(--danger-soft); }
+.time-range-helper.is-shake { animation: time-shake .4s ease; }
+.time-range-suggest {
+  border: 0; background: transparent; padding: 0;
+  font: inherit; color: var(--green); font-weight: 700; cursor: pointer;
+}
+.time-range-suggest.is-pulse { animation: time-pulse .8s ease; }
+.time-range-suggest:hover { text-decoration: underline; }
+
+.filter-pill-btn.is-invalid { border-color: #dc2626; }
+.filter-pill-label.is-invalid-text,
+.date-picker-hint.is-invalid-text { color: var(--danger); font-weight: 600; }
+
+.time-picker-item.is-disabled {
+  opacity: .4;
+  cursor: not-allowed;
+  color: var(--muted);
+}
+.time-picker-item.is-disabled:hover { background: transparent; }
+.time-picker-seg button.is-grey {
+  opacity: .4;
+  cursor: not-allowed;
+}
+
+@keyframes time-shake {
+  0%,100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+@keyframes time-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(22,163,74,.6); }
+  70% { box-shadow: 0 0 0 6px rgba(22,163,74,0); }
+  100% { box-shadow: 0 0 0 0 rgba(22,163,74,0); }
+}
+

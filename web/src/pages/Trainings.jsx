@@ -758,7 +758,7 @@ export default function Trainings() {
             }}
           />
           <Field label="Title" required error={Boolean(fieldError("title"))}>
-            <input value={form.title} onChange={setText("title")} onBlur={(e) => setForm({ ...form, title: capitalizeFirst(e.target.value.trim()) })} required />
+            <input value={form.title} onChange={setText("title")} onBlur={(e) => setForm({ ...form, title: capitalizeFirst(e.target.value.trim()) })} required data-capitalize="true" />
             {fieldError("title") && (
               <span className="error">{fieldError("title")}</span>
             )}
@@ -773,6 +773,7 @@ export default function Trainings() {
               onChange={setText("description")}
               onBlur={(e) => setForm({ ...form, description: capitalizeFirst(e.target.value) })}
               rows={3}
+              data-capitalize="true"
             />
             {fieldError("description") && (
               <span className="error">{fieldError("description")}</span>

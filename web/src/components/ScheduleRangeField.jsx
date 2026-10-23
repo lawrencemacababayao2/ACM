@@ -42,6 +42,8 @@ export default function ScheduleRangeField({ value, onChange, error }) {
           <TimeRangePicker
             start={value.time_from || ''}
             end={value.time_to || ''}
+            dateFrom={value.date_from || ''}
+            dateTo={value.date_to || value.date_from || ''}
             onChange={({ start, end }) => set({ time_from: start || '', time_to: end || '' })}
             ariaLabel="Time range"
           />

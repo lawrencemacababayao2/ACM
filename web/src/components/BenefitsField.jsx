@@ -40,6 +40,7 @@ export default function BenefitsField({ benefits, onChange }) {
             onBlur={() => handleBlur(i)}
             placeholder={`Benefit ${i + 1}`}
             style={{ flex: 1 }}
+            data-capitalize="true"
           />
           <button
             type="button"

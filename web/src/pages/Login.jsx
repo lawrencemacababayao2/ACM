@@ -71,6 +71,12 @@ export default function Login() {
             value={mobile}
             onChange={(e) => setMobile(e.target.value)}
             placeholder="09123456789"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            data-no-format="true"
+            data-sensitive="true"
+            style={{ textTransform: 'none', WebkitTextTransform: 'none' }}
             required
           />
         </div>
@@ -81,6 +87,11 @@ export default function Login() {
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
             autoComplete="current-password"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            inputMode="text"
+            style={{ textTransform: 'none', WebkitTextTransform: 'none' }}
             required
           />
         </div>

@@ -369,11 +369,11 @@ meta={filters.isFiltered
           <DraftNotice savedAt={draft.savedAt} restoredAt={draft.restoredAt} onDiscard={() => { draft.clear(); setForm(EMPTY); setFormErrors(null); }} />
           <FormError error={save.error} onRetry={() => { void submit(); }} />
           <Field label="Title" required error={Boolean(fieldError('title'))}>
-            <input value={form.title} onChange={setText('title')} onBlur={(e) => setForm({ ...form, title: capitalizeFirst(e.target.value.trim()) })} required />
+            <input value={form.title} onChange={setText('title')} onBlur={(e) => setForm({ ...form, title: capitalizeFirst(e.target.value.trim()) })} required data-capitalize="true" />
             {fieldError('title') && <span className="error">{fieldError('title')}</span>}
           </Field>
           <Field label="Content" required error={Boolean(fieldError('body'))}>
-            <textarea value={form.body} onChange={setText('body')} onBlur={(e) => setForm({ ...form, body: capitalizeFirst(e.target.value) })} required rows={6} />
+            <textarea value={form.body} onChange={setText('body')} onBlur={(e) => setForm({ ...form, body: capitalizeFirst(e.target.value) })} required rows={6} data-capitalize="true" />
             {fieldError('body') && <span className="error">{fieldError('body')}</span>}
           </Field>
           <Field label="Target Beneficiary Type" required error={Boolean(fieldError('target_beneficiary_types'))}>

@@ -4,60 +4,137 @@ import { formatTime12, pad, parseTime24 } from '../lib/dateUtils.js';
 const HOURS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 const MINUTES = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
 
+function to24(h12, isPm) {
+  if (h12 === 12) return isPm ? 12 : 0;
+  return isPm ? h12 + 12 : h12;
+}
+
+function parseHm24(v) {
+  const p = parseTime24(v);
+  if (!p) return null;
+  return { h: p.h, m: p.m, total: p.h * 60 + p.m };
+}
+
 /**
  * The hour / minute / AM-PM half of a time control, with no popover and no date.
- *
- * This was lifted out of DateTimePicker so the trainings form could pick a time
- * *range* in the same visual language instead of asking someone to type
- * "8:00 AM - 5:00 PM" into a text box. Two callers now share one implementation,
- * which is why the wheel takes a plain value + onChange rather than owning state:
- * DateTimePicker keeps its date alongside it, TimeRangePicker points it at one end
- * of a range.
- *
- * `value` is 'HH:MM' on a 24-hour clock. `label` names the column set for screen
- * readers; a range picker passes something like "Start time".
  */
-export default function TimeWheel({ value, onChange, label = 'Time', id, disabledTimes = null, maxTime = null, currentDate = null, min = null, max = null }) {
+export default function TimeWheel({
+  value,
+  onChange,
+  label = 'Time',
+  id,
+  rangeStartTime = null,
+  rangeStartDate = null,
+  rangeEndDate = null,
+  isEnd = false,
+  onDisabledClick,
+  onValidityChange,
+}) {
   const parts = parseTime24(value) || { h: 9, m: 0 };
   const isPm = parts.h >= 12;
 
-  const isTimeDisabled = (h24, m24) => {
-    // Check against min time
-    if (min && currentDate === min.split('T')[0]) {
-      const minTime = min.split('T')[1];
-      const [minH, minM] = minTime.split(':').map(Number);
-      if (h24 < minH || (h24 === minH && m24 < minM)) return true;
-    }
-    // Check against max time
-    if (max && currentDate === max.split('T')[0]) {
-      const maxTime = max.split('T')[1];
-      const [maxH, maxM] = maxTime.split(':').map(Number);
-      if (h24 > maxH || (h24 === maxH && m24 > maxM)) return true;
-    }
-    return false;
+  const toMinutes = (h24, m24) => h24 * 60 + m24;
+
+  const isEndDateAfterStart = () => {
+    if (!isEnd || !rangeStartDate || !rangeEndDate) return false;
+    return rangeEndDate > rangeStartDate;
+  };
+
+  const isOptionDisabled = ({ h24, m24 }) => {
+    if (!isEnd || !rangeStartTime) return false;
+    if (isEndDateAfterStart()) return false;
+    const start = parseHm24(rangeStartTime);
+    if (!start) return false;
+    // disabled only if NOT later than start time (so equal is disabled)
+    return toMinutes(h24, m24) <= start.total;
   };
 
   const isHourDisabled = (h24) => {
-    // Check if any minute in this hour is enabled
+    if (!isEnd || !rangeStartTime) return false;
+    if (isEndDateAfterStart()) return false;
+    const start = parseHm24(rangeStartTime);
+    if (!start) return false;
+    // hour disabled only if no minute in that hour would be valid (even :55 not later)
     for (const m of MINUTES) {
-      if (!isTimeDisabled(h24, m)) return false;
+      if (toMinutes(h24, m) > start.total) return false;
     }
     return true;
   };
 
-  const isMinuteDisabled = (h24, m) => isTimeDisabled(h24, m);
+  const isMinuteDisabled = (h24, m24) => {
+    if (!isEnd || !rangeStartTime) return false;
+    if (isEndDateAfterStart()) return false;
+    const start = parseHm24(rangeStartTime);
+    if (!start) return false;
+    // minute disabled only when same hour and AM/PM as start, and minute <= start minute
+    if (h24 === start.h) {
+      return m24 <= start.m;
+    }
+    return toMinutes(h24, m24) <= start.total;
+  };
 
   const emit = (h24, m24) => {
-    if (isTimeDisabled(h24, m24)) return;
+    if (isOptionDisabled({ h24, m24 })) {
+      if (onDisabledClick) onDisabledClick(h24, m24);
+      return;
+    }
     onChange?.(`${pad(h24)}:${pad(m24)}`);
   };
+
+  // notify parent about validity
+  React.useEffect(() => {
+    if (!onValidityChange) return;
+    const start = parseHm24(rangeStartTime);
+    if (!isEnd || !start || isEndDateAfterStart()) {
+      onValidityChange({ hasDisabled: false, currentInvalid: false, startLabel: start ? formatTime12(start.h, start.m) : '' });
+      return;
+    }
+    let hasDisabled = false;
+    for (let h12 = 1; h12 <= 12; h12++) {
+      const h24 = h12 % 12 + (isPm ? 12 : 0);
+      if (isHourDisabled(h24)) { hasDisabled = true; break; }
+    }
+    if (!hasDisabled) {
+      for (let h12 = 1; h12 <= 12; h12++) {
+        const h24 = h12 % 12 + (isPm ? 12 : 0);
+        for (const m of MINUTES) {
+          if (isMinuteDisabled(h24, m)) { hasDisabled = true; break; }
+        }
+        if (hasDisabled) break;
+      }
+    }
+    const currentInvalid = parts.h * 60 + parts.m <= start.total;
+    onValidityChange({ hasDisabled, currentInvalid, startLabel: formatTime12(start.h, start.m) });
+  }, [value, isEnd, rangeStartTime, rangeStartDate, rangeEndDate, isPm]); // eslint-disable-line
+
+  // check if all hours disabled in current AM/PM
+  const allHoursDisabledInCurrentPeriod = () => {
+    if (!isEnd || !rangeStartTime || isEndDateAfterStart()) return false;
+    for (const h of HOURS) {
+      const h12 = h === 12 ? 0 : h;
+      const h24 = h % 12 + (isPm ? 12 : 0);
+      if (!isHourDisabled(h24)) return false;
+    }
+    return true;
+  };
+
+  const start = parseHm24(rangeStartTime);
+  const startLabel = start ? formatTime12(start.h, start.m) : '';
+  const allDisabled = allHoursDisabledInCurrentPeriod();
 
   return (
     <div className="time-picker">
       <div className="time-picker-head">
         <span className="time-picker-title">{label}</span>
         <div className="time-picker-seg" role="group" aria-label="AM or PM">
-          <button type="button" className={!isPm ? 'is-on' : ''} aria-pressed={!isPm} onClick={() => emit(parts.h % 12, parts.m)}>
+          <button
+            type="button"
+            className={!isPm ? 'is-on' : ''}
+            aria-pressed={!isPm}
+            disabled={allDisabled && !isPm}
+            title={allDisabled && !isPm ? `No valid AM times after the start.` : undefined}
+            onClick={() => { if (allDisabled && !isPm) return; emit(parts.h % 12, parts.m); }}
+          >
             AM
           </button>
           <button type="button" className={isPm ? 'is-on' : ''} aria-pressed={isPm} onClick={() => emit((parts.h % 12) + 12, parts.m)}>
@@ -75,6 +152,7 @@ export default function TimeWheel({ value, onChange, label = 'Time', id, disable
               const h24 = h % 12 + (isPm ? 12 : 0);
               const on = h12 === parts.h % 12;
               const disabled = isHourDisabled(h24);
+              const tip = disabled ? `Must be after ${startLabel}` : undefined;
               return (
                 <button
                   key={h}
@@ -83,8 +161,8 @@ export default function TimeWheel({ value, onChange, label = 'Time', id, disable
                   aria-pressed={on}
                   aria-disabled={disabled}
                   aria-label={`${h} ${isPm ? 'PM' : 'AM'}`}
+                  title={tip}
                   onClick={() => emit(h24, parts.m)}
-                  disabled={disabled}
                 >
                   {h}
                 </button>
@@ -99,16 +177,17 @@ export default function TimeWheel({ value, onChange, label = 'Time', id, disable
             {MINUTES.map((m) => {
               const on = m === parts.m;
               const disabled = isMinuteDisabled(parts.h, m);
+              const tip = disabled ? `Must be after ${startLabel}` : undefined;
               return (
                 <button
                   key={m}
                   type="button"
-                  className={`time-picker-item${on ? ' is-on' : ''}${disabled ? ' is-disabled' : ''}${m % 15 !== 0 ? ' is-sub' : ''}`}
+                  className={`time-picker-item${on ? ' is-on' : ''}${disabled ? ' is-disabled' : ''}`}
                   aria-pressed={on}
                   aria-disabled={disabled}
                   aria-label={`${m} minutes past the hour`}
+                  title={tip}
                   onClick={() => emit(parts.h, m)}
-                  disabled={disabled}
                 >
                   {pad(m)}
                 </button>

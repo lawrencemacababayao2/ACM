@@ -552,11 +552,11 @@ meta={filters.isFiltered
           <DraftNotice savedAt={draft.savedAt} restoredAt={draft.restoredAt} onDiscard={() => { draft.clear(); setForm({ ...EMPTY, benefits: [] }); setFormErrors(null); }} />
           <FormError error={save.error} onRetry={() => { void submit(); }} />
           <Field label="Title" required error={Boolean(fieldError('title'))}>
-            <input value={form.title} onChange={setText('title')} onBlur={(e) => setForm({ ...form, title: capitalizeFirst(e.target.value.trim()) })} required />
+            <input value={form.title} onChange={setText('title')} onBlur={(e) => setForm({ ...form, title: capitalizeFirst(e.target.value.trim()) })} required data-capitalize="true" />
             {fieldError('title') && <span className="error">{fieldError('title')}</span>}
           </Field>
           <Field label="Description" col2 error={Boolean(fieldError('description'))}>
-            <textarea value={form.description} onChange={setText('description')} onBlur={(e) => setForm({ ...form, description: capitalizeFirst(e.target.value) })} rows={3} />
+            <textarea value={form.description} onChange={setText('description')} onBlur={(e) => setForm({ ...form, description: capitalizeFirst(e.target.value) })} rows={3} data-capitalize="true" />
             {fieldError('description') && <span className="error">{fieldError('description')}</span>}
           </Field>
 

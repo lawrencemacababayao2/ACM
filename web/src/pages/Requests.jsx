@@ -948,6 +948,7 @@ function CorrectionPanel({
               onBlur={(e) => setRejectReason(capitalizeFirst(e.target.value))}
               placeholder="Shown to the farmer if rejected"
               required
+              data-capitalize="true"
             />
           </Field>
           <div
@@ -1193,6 +1194,7 @@ function ItemPanel({
                 onBlur={(e) =>
                   setForm({ ...form, admin_notes: capitalizeFirst(e.target.value) })
                 }
+                data-capitalize="true"
               />
             </Field>
           </div>

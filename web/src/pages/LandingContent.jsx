@@ -552,6 +552,7 @@ export default function LandingContent() {
           value={val}
           onChange={(e) => setItem(i, field, applyCapitalizeFirst(e.target))}
           onBlur={(e) => setItem(i, field, capitalizeFirst(e.target.value))}
+          data-capitalize="true"
         />
       );
     }
@@ -592,6 +593,7 @@ export default function LandingContent() {
           value={val}
           onChange={(e) => setItem(i, field, applyCapitalizeFirst(e.target))}
           onBlur={(e) => setItem(i, field, capitalizeFirst(e.target.value))}
+          data-capitalize="true"
         />
       );
     }
@@ -1015,14 +1017,14 @@ export default function LandingContent() {
                   typeof p === 'string' ? (
                     <div className="grid2 point-row" key={pi}>
                       <LField label="Point" col2>
-                        <textarea rows={2} value={p} onChange={(e) => setPoint(idx, pi, 'point', applyCapitalizeFirst(e.target))} onBlur={(e) => setPoint(idx, pi, 'point', capitalizeFirst(e.target.value))} placeholder="e.g. Distribution of certified seeds and farm inputs" />
+                        <textarea rows={2} value={p} onChange={(e) => setPoint(idx, pi, 'point', applyCapitalizeFirst(e.target))} onBlur={(e) => setPoint(idx, pi, 'point', capitalizeFirst(e.target.value))} placeholder="e.g. Distribution of certified seeds and farm inputs" data-capitalize="true" />
                       </LField>
                       <div className="point-del"><button className="ghost-icon-btn" onClick={() => removePoint(idx, pi)} aria-label={`Remove point ${pi + 1}`} title="Remove point"><Icon name="trash" size={14} /></button></div>
                     </div>
                   ) : (
                     <div className="grid2 point-row" key={pi}>
-                      <LField label="Title" required={section === 'services'}><input value={p.title || ''} onChange={(e) => setPoint(idx, pi, 'title', applyCapitalizeFirst(e.target))} onBlur={(e) => setPoint(idx, pi, 'title', capitalizeFirst(e.target.value))} /></LField>
-                      <LField label="Description" required={section === 'services'}><textarea rows={2} value={p.desc || ''} onChange={(e) => setPoint(idx, pi, 'desc', applyCapitalizeFirst(e.target))} onBlur={(e) => setPoint(idx, pi, 'desc', capitalizeFirst(e.target.value))} /></LField>
+                      <LField label="Title" required={section === 'services'}><input value={p.title || ''} onChange={(e) => setPoint(idx, pi, 'title', applyCapitalizeFirst(e.target))} onBlur={(e) => setPoint(idx, pi, 'title', capitalizeFirst(e.target.value))} data-capitalize="true" /></LField>
+                      <LField label="Description" required={section === 'services'}><textarea rows={2} value={p.desc || ''} onChange={(e) => setPoint(idx, pi, 'desc', applyCapitalizeFirst(e.target))} onBlur={(e) => setPoint(idx, pi, 'desc', capitalizeFirst(e.target.value))} data-capitalize="true" /></LField>
                       <div className="point-del"><button className="ghost-icon-btn" onClick={() => removePoint(idx, pi)} aria-label={`Remove point ${pi + 1}`} title="Remove point"><Icon name="trash" size={14} /></button></div>
                     </div>
                   )
@@ -1179,7 +1181,7 @@ export default function LandingContent() {
                 {slideError && <span className="error">{slideError}</span>}
               </Field>
               <Field label="Caption" required hint="The text displayed on top of the image">
-                <textarea value={slideForm.title} onChange={setSlide('title')} rows={3} required placeholder="e.g. Free vaccination drive for livestock — July 30, municipal gym" />
+                <textarea value={slideForm.title} onChange={setSlide('title')} rows={3} required placeholder="e.g. Free vaccination drive for livestock — July 30, municipal gym" data-capitalize="true" />
               </Field>
               <Field label="Category" required hint="Tag shown above the caption">
                 <CustomSelect
@@ -1266,8 +1268,8 @@ export default function LandingContent() {
             <form onSubmit={submitFaq}>
               <DraftNotice savedAt={faqDraft.savedAt} restoredAt={faqDraft.restoredAt} onDiscard={() => { faqDraft.clear(); setFaqForm(EMPTY_FAQ); }} />
               <FormError error={faqSave.error} onRetry={() => { void submitFaq(); }} />
-              <Field label="Question" required><input value={faqForm.question} onChange={setFaq('question')} required /></Field>
-              <Field label="Answer" required col2><textarea value={faqForm.answer} onChange={setFaq('answer')} rows={4} required /></Field>
+              <Field label="Question" required><input value={faqForm.question} onChange={setFaq('question')} required data-capitalize="true" /></Field>
+              <Field label="Answer" required col2><textarea value={faqForm.answer} onChange={setFaq('answer')} rows={4} required data-capitalize="true" /></Field>
               <Field label="Keywords" col2><input value={faqForm.keywords} onChange={setFaq('keywords')} placeholder="space-separated: hours open schedule time" /></Field>
               <div className="flex" style={{ justifyContent: 'flex-end', gap: 8, alignItems: 'center' }}>
                 {!online && <span className="muted">Waiting for connection…</span>}
@@ -1286,10 +1288,10 @@ export default function LandingContent() {
               <strong>Contact details</strong>
             </div>
             <div className="grid2">
-              <LField label="Eyebrow" required><textarea rows={1} value={contactData.heading || ''} onChange={setContact('heading')} /></LField>
-              <LField label="Title" required><textarea rows={1} value={contactData.title || ''} onChange={setContact('title')} /></LField>
-              <LField label="Address" col2 required><input value={contactData.address || ''} onChange={setContact('address')} /></LField>
-              <LField label="Office Hours" required><input value={contactData.hours || ''} onChange={setContact('hours')} /></LField>
+              <LField label="Eyebrow" required><textarea rows={1} value={contactData.heading || ''} onChange={setContact('heading')} data-capitalize="true" /></LField>
+              <LField label="Title" required><textarea rows={1} value={contactData.title || ''} onChange={setContact('title')} data-capitalize="true" /></LField>
+              <LField label="Address" col2 required><input value={contactData.address || ''} onChange={setContact('address')} data-capitalize="true" /></LField>
+              <LField label="Office Hours" required><input value={contactData.hours || ''} onChange={setContact('hours')} data-capitalize="true" /></LField>
               <LField label="Phone" required><input value={contactData.phone || ''} onChange={setContact('phone')} /></LField>
               <LField label="Email" col2 required><textarea rows={1} value={contactData.email || ''} onChange={setContact('email')} /></LField>
             </div>
