@@ -94,7 +94,7 @@ const FIELD_LABELS = {
   full_name: "Full name",
   contact_number: "Contact number",
   barangay: "Barangay",
-  id_number: "ID number",
+  id_number: "RSBSA number",
   quantity: "Quantity",
   purpose: "Purpose",
   farm_area: "Farm area (ha)",
@@ -386,9 +386,9 @@ export default function Requests() {
     toast(
       action === "approve"
         ? selected.type === "profile_correction"
-          ? `Request No. REQ-${String(selected.id).padStart(4,"0")} correction approved (SMS notified)`
-          : `Request No. REQ-${String(selected.id).padStart(4,"0")} approved (SMS notified)`
-        : `Request No. REQ-${String(selected.id).padStart(4,"0")} rejected (SMS notified)`,
+          ? `REQ-${String(selected.id).padStart(4, "0")} correction approved (SMS notified)`
+          : `REQ-${String(selected.id).padStart(4, "0")} approved (SMS notified)`
+        : `REQ-${String(selected.id).padStart(4, "0")} rejected (SMS notified)`,
       "ok",
     );
     setSelected(null);
@@ -413,15 +413,15 @@ export default function Requests() {
         action.charAt(0).toUpperCase() +
         action.slice(1).replace("_", " ") +
         " request",
-      message: label + ` (Request No. REQ-${String(selected?.id).padStart(4,"0")}) This will notify the beneficiary via SMS.`,
+      message:
+        label +
+        ` (REQ-${String(selected?.id).padStart(4, "0")}) This will notify the beneficiary via SMS.`,
       onConfirm: () => decide(action),
       confirmLabel:
         action.charAt(0).toUpperCase() + action.slice(1).replace("_", " "),
       danger: action === "reject",
     });
   };
-
-
 
   // ── Filter options ──────────────────────────────────────────────────────
   const benTypeOptions = [
@@ -540,10 +540,26 @@ export default function Requests() {
           sortDir={sortDir}
           onSort={handleSort}
           onRowClick={openDetail}
-        columns={[
-          { key: "id", label: "Request No.", sortValue: true, render: (r) => <span style={{ fontVariantNumeric: "tabular-nums", fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace", color: "var(--muted)" }}>{r.id == null ? "—" : `REQ-${String(r.id).padStart(4,"0")}`}</span> },
-          {
-            key: "beneficiary",
+          columns={[
+            {
+              key: "id",
+              label: "Request No.",
+              sortValue: true,
+              render: (r) => (
+                <span
+                  style={{
+                    fontVariantNumeric: "tabular-nums",
+                    fontFamily:
+                      "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
+                    color: "var(--muted)",
+                  }}
+                >
+                  {r.id == null ? "—" : `REQ-${String(r.id).padStart(4, "0")}`}
+                </span>
+              ),
+            },
+            {
+              key: "beneficiary",
               label: "Beneficiary",
               sortValue: true,
               render: (r) => (
@@ -615,21 +631,21 @@ export default function Requests() {
             {
               key: "actions",
               label: "",
-            render: (r) => (
-              <div className="row-actions">
-                <button
-                  className="btn sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openDetail(r);
-                  }}
-                >
-                  {["completed", "rejected"].includes(r.status)
-                    ? "View"
-                    : "Process"}
-                </button>
-              </div>
-            ),
+              render: (r) => (
+                <div className="row-actions">
+                  <button
+                    className="btn sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openDetail(r);
+                    }}
+                  >
+                    {["completed", "rejected"].includes(r.status)
+                      ? "View"
+                      : "Process"}
+                  </button>
+                </div>
+              ),
             },
           ]}
         />
@@ -650,7 +666,7 @@ export default function Requests() {
           onClose={requestClose}
           title={
             selected
-              ? `Request No. REQ-${String(selected.id).padStart(4,"0")} · ${selected.first_name} ${selected.last_name}`
+              ? `REQ-${String(selected.id).padStart(4, "0")} · ${selected.first_name} ${selected.last_name}`
               : ""
           }
           size="lg"
@@ -976,9 +992,7 @@ function ItemPanel({
       (request.field_values ? JSON.parse(request.field_values) : {});
   } catch {}
   const displayFields = Object.entries(fv)
-    .filter(
-      ([k]) => k !== "beneficiary_type" && !k.endsWith("__specify"),
-    )
+    .filter(([k]) => k !== "beneficiary_type" && !k.endsWith("__specify"))
     .map(([k, v]) => {
       // A select answered with "Other" is stored as the placeholder plus a
       // separate `<key>__specify` value. Fold the two into one row so the
@@ -987,9 +1001,10 @@ function ItemPanel({
       const isOther = v === "other" || v === "__other__";
       let value;
       if (isOther) {
-        value = spec != null && String(spec).trim() !== ""
-          ? String(spec).trim()
-          : "Other";
+        value =
+          spec != null && String(spec).trim() !== ""
+            ? String(spec).trim()
+            : "Other";
       } else {
         value = resolveChoice(k, v, catalog) || String(v ?? "—");
       }
@@ -1155,10 +1170,16 @@ function ItemPanel({
                 rows={3}
                 value={form.admin_notes}
                 onChange={(e) =>
-                  setForm({ ...form, admin_notes: applyCapitalizeFirst(e.target) })
+                  setForm({
+                    ...form,
+                    admin_notes: applyCapitalizeFirst(e.target),
+                  })
                 }
                 onBlur={(e) =>
-                  setForm({ ...form, admin_notes: capitalizeFirst(e.target.value) })
+                  setForm({
+                    ...form,
+                    admin_notes: capitalizeFirst(e.target.value),
+                  })
                 }
                 data-capitalize="true"
               />

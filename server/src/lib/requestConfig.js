@@ -13,7 +13,7 @@ const DEFAULT_TARGET_OPTIONS = [
 // Which profile field supplies the ID number for a type, and how it is labelled.
 const ID_BY_TYPE = {
   fisherfolk: { key: 'id_number', label: 'FishR ID number', source: 'fishr_number' },
-  farmer: { key: 'id_number', label: 'RSBSA / Farmer ID number', source: 'rsbsa_number' },
+  farmer: { key: 'id_number', label: 'RSBSA number', source: 'rsbsa_number' },
 };
 
 // Profile details that ride along with every request. Autofilled from the
@@ -206,7 +206,8 @@ export const REQUEST_CONFIG = {
         quantityKey: 'quantity',
         fields: [
           { key: 'quantity', label: 'Quantity (bags)', kind: 'number', required: true, min: 1 },
-          { key: 'fertilizer_type', label: 'Fertilizer type', kind: 'select', required: true,
+          {
+            key: 'fertilizer_type', label: 'Fertilizer type', kind: 'select', required: true,
             choices: [
               { value: 'corn-microbial', label: 'Corn microbial fertilizer' },
               { value: 'ammonium-sulfate', label: 'Ammonium sulfate' },
