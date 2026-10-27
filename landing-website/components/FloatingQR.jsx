@@ -53,7 +53,7 @@ export default function FloatingQR() {
               </button>
             </div>
             <img
-              src="/DownloadbyQR.png"
+              src="/DownloadbyQRcode.png"
               alt="QR Code"
               style={{
                 width: 200,
