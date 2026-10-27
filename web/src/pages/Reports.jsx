@@ -20,6 +20,7 @@ import {
   renderCell, renderField, formatDate, formatNumber, todayISO,
 } from '../reportTypes.jsx';
 import { loadSeal, drawLetterhead, drawFooterTotal, drawPageNumber } from '../lib/pdfLetterhead.js';
+import { revealFirstFieldErrorSoon } from '../lib/formErrors.js';
 
 // Generic shell for every report the registry defines.
 //
@@ -96,6 +97,7 @@ export default function Reports() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({});
+  const formRef = useRef(null);
   const [errors, setErrors] = useState({});
   const [confirm, setConfirm] = useState(null);
   const [closeConfirm, setCloseConfirm] = useState(null);
@@ -422,6 +424,7 @@ const fieldGroups = useMemo(() => {
         }
         if (Object.keys(fieldErrors).length) {
           setErrors(fieldErrors);
+          revealFirstFieldErrorSoon(formRef.current);
         } else {
           setErrors({ _form: save.error.message });
           toast(save.error.message, 'err');
@@ -612,10 +615,10 @@ const fieldGroups = useMemo(() => {
             onChange={setTypeKey}
           />
         )}
-        <button className="btn" onClick={exportCsv}>
+        <button className="btn export-csv" onClick={exportCsv}>
           <Icon name="download" size={15} /> Export CSV
         </button>
-        <button className="btn" onClick={exportPdf} disabled={exporting || !total}>
+        <button className="btn export-pdf" onClick={exportPdf} disabled={exporting || !total}>
           <Icon name="download" size={15} /> {exporting ? 'Preparing…' : 'Export PDF'}
         </button>
         <button className="btn primary" onClick={openAdd}>
@@ -713,7 +716,7 @@ const fieldGroups = useMemo(() => {
       </div>
 
       <Modal open={open} onClose={requestClose} title={editing ? 'Edit record' : 'Add record'}>
-        <form onSubmit={submit}>
+        <form ref={formRef} onSubmit={submit}>
           <DraftNotice savedAt={draft.savedAt} restoredAt={draft.restoredAt} onDiscard={() => { draft.clear(); setForm(blankForm()); setErrors({}); }} />
           <FormError error={save.error} onRetry={() => { void submit(); }} />
           {/* Grouped by the `section` the config declares, in the order the paper

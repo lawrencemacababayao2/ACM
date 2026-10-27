@@ -13,6 +13,7 @@ import { LoadingStatus, useSkeletonVisible } from '../components/Skeleton.jsx';
 import { useToast } from '../toast.jsx';
 import { passwordProblem, PASSWORD_MIN_LENGTH, PASSWORD_MAX_LENGTH } from '../lib/password.js';
 import { formatName, formatNameInput, nameProblem, displayName } from '../lib/name.js';
+import { revealFirstFieldErrorSoon } from '../lib/formErrors.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MOBILE_RE = /^09\d{9}$/;
@@ -83,6 +84,7 @@ export default function Profile() {
   const [discardPw, setDiscardPw] = useState(false);
 
   const fileRef = useRef(null);
+  const pwFormRef = useRef(null);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [photoConfirm, setPhotoConfirm] = useState(false);
 
@@ -211,6 +213,7 @@ export default function Profile() {
     }
     if (Object.keys(errors).length) {
       setFieldErrors(errors);
+      revealFirstFieldErrorSoon(() => document.getElementById(PROFILE_FORM_ID));
       return;
     }
 
@@ -232,10 +235,12 @@ export default function Profile() {
       const details = save.error?.details;
       if (details?.code === 'DUPLICATE_BLOCK') {
         setDupErrors(Array.isArray(details.errors) ? details.errors : []);
+        revealFirstFieldErrorSoon(() => document.getElementById(PROFILE_FORM_ID));
         return;
       }
       if (save.error?.kind === 'validation' && details?.field) {
         setFieldErrors({ [EDIT_FIELD_MAP[details.field] || details.field]: save.error.message });
+        revealFirstFieldErrorSoon(() => document.getElementById(PROFILE_FORM_ID));
       }
       return;
     }
@@ -290,6 +295,7 @@ export default function Profile() {
     if (!errors.next && pw.next !== pw.confirm) errors.confirm = 'Passwords do not match';
     if (Object.keys(errors).length) {
       setPwErrors(errors);
+      revealFirstFieldErrorSoon(pwFormRef.current);
       return;
     }
 
@@ -313,6 +319,7 @@ export default function Profile() {
           newPassword_confirmation: 'confirm',
         };
         setPwErrors({ [map[details.field] || 'current']: pwSave.error.message });
+        revealFirstFieldErrorSoon(pwFormRef.current);
       }
       return;
     }
@@ -603,7 +610,7 @@ export default function Profile() {
       )}
 
       <Modal open={pwOpen} onClose={requestClosePw} title="Change password">
-        <form onSubmit={submitPassword}>
+        <form ref={pwFormRef} onSubmit={submitPassword}>
           <div>
             <FormError error={pwSave.error} onRetry={() => { void submitPassword(); }} />
           </div>

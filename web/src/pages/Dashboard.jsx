@@ -151,7 +151,7 @@ export default function Dashboard() {
     .filter((e) => e.phase === "upcoming" || e.phase === "ongoing")
     .slice(0, 3);
   const requestColumns = [
-    { key: "id", label: "ID" },
+    { key: "id", label: "Request No." },
     { key: "name", label: "Beneficiary" },
     { key: "subject", label: "Request" },
     { key: "status", label: "Status" },
@@ -252,7 +252,7 @@ export default function Dashboard() {
                       );
                       return (
                         <tr key={r.id}>
-                          <td className="dash-id">#{r.id}</td>
+                          <td className="dash-id" style={{ fontVariantNumeric: "tabular-nums", fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace" }}>{r.id == null ? "—" : `REQ-${String(r.id).padStart(4,"0")}`}</td>
                           <td>
                             <div className="dash-cell-strong">
                               {nameOf(r)}

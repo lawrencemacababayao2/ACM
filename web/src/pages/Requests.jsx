@@ -111,6 +111,8 @@ const FIELD_LABELS = {
   cage_size: "Cage size",
   animal_type: "Animal type",
   animal_location: "Animal location",
+  number_of_animals: "Number of animals",
+  vaccine_type: "Vaccine type",
   service_type: "Service type",
   remarks: "Remarks",
   seed_type: "Seed type",
@@ -213,7 +215,6 @@ export default function Requests() {
   const [lastAction, setLastAction] = useState("approve");
   const [closeConfirm, setCloseConfirm] = useState(null);
   const [actionConfirm, setActionConfirm] = useState(null);
-  const [deleting, setDeleting] = useState(false);
 
   const user = api.user();
   const online = useOnlineStatus();
@@ -269,6 +270,7 @@ export default function Requests() {
       "subject",
       "rsbsa_number",
       "contact_number",
+      "id",
     ],
     filters: [
       {
@@ -362,6 +364,12 @@ export default function Requests() {
 
   const decide = async (action) => {
     if (save.busy || !selected) return;
+    if (action === "reject" && !rejectReason.trim()) {
+      const el = document.querySelector(".modal-body textarea");
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      el?.focus();
+      return;
+    }
     console.log("[decide]", action, selected.id);
     setLastAction(action);
     const body = action === "reject" ? { reason: rejectReason } : {};
@@ -378,9 +386,9 @@ export default function Requests() {
     toast(
       action === "approve"
         ? selected.type === "profile_correction"
-          ? "Correction approved (SMS notified)"
-          : "Request approved (SMS notified)"
-        : "Request rejected (SMS notified)",
+          ? `Request No. REQ-${String(selected.id).padStart(4,"0")} correction approved (SMS notified)`
+          : `Request No. REQ-${String(selected.id).padStart(4,"0")} approved (SMS notified)`
+        : `Request No. REQ-${String(selected.id).padStart(4,"0")} rejected (SMS notified)`,
       "ok",
     );
     setSelected(null);
@@ -405,7 +413,7 @@ export default function Requests() {
         action.charAt(0).toUpperCase() +
         action.slice(1).replace("_", " ") +
         " request",
-      message: label + " This will notify the beneficiary via SMS.",
+      message: label + ` (Request No. REQ-${String(selected?.id).padStart(4,"0")}) This will notify the beneficiary via SMS.`,
       onConfirm: () => decide(action),
       confirmLabel:
         action.charAt(0).toUpperCase() + action.slice(1).replace("_", " "),
@@ -413,35 +421,7 @@ export default function Requests() {
     });
   };
 
-  const confirmDelete = (r) => {
-    setActionConfirm({
-      title: "Delete request",
-      message: `Delete request ${r.id} for "${
-        r.name || `${r.first_name} ${r.last_name}`
-      }"? This permanently removes the request, its status history and related notifications. This cannot be undone.`,
-      onConfirm: () => doDelete(r),
-      confirmLabel: "Delete",
-      danger: true,
-    });
-  };
 
-  const doDelete = async (r) => {
-    if (deleting) return;
-    setDeleting(true);
-    try {
-      await api.del(`/requests/${r.id}`);
-      toast("Request deleted", "ok");
-      if (selected?.id === r.id) {
-        draft.clear();
-        setSelected(null);
-      }
-      load();
-    } catch (err) {
-      toast(err.message, "err");
-    } finally {
-      setDeleting(false);
-    }
-  };
 
   // ── Filter options ──────────────────────────────────────────────────────
   const benTypeOptions = [
@@ -502,7 +482,7 @@ export default function Requests() {
       />
 
       <RecordToolbar
-        searchPlaceholder="Search by name, subject, RSBSA no., or mobile"
+        searchPlaceholder="Search by request no., name, subject, RSBSA no., or mobile"
         searchValue={filters.search}
         onSearch={filters.setSearch}
         onClearFilters={filters.isFiltered ? filters.reset : undefined}
@@ -541,7 +521,7 @@ export default function Requests() {
         <TableSkeleton
           rows={6}
           columns={[
-            { key: "id", label: "ID" },
+            { key: "id", label: "Request No." },
             { key: "beneficiary", label: "Beneficiary" },
             { key: "request", label: "Request" },
             { key: "beneficiary_type", label: "Beneficiary type" },
@@ -560,10 +540,10 @@ export default function Requests() {
           sortDir={sortDir}
           onSort={handleSort}
           onRowClick={openDetail}
-          columns={[
-            { key: "id", label: "ID", sortValue: true },
-            {
-              key: "beneficiary",
+        columns={[
+          { key: "id", label: "Request No.", sortValue: true, render: (r) => <span style={{ fontVariantNumeric: "tabular-nums", fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace", color: "var(--muted)" }}>{r.id == null ? "—" : `REQ-${String(r.id).padStart(4,"0")}`}</span> },
+          {
+            key: "beneficiary",
               label: "Beneficiary",
               sortValue: true,
               render: (r) => (
@@ -635,33 +615,21 @@ export default function Requests() {
             {
               key: "actions",
               label: "",
-              render: (r) => (
-                <div className="row-actions">
-                  <button
-                    className="btn sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openDetail(r);
-                    }}
-                  >
-                    {["completed", "rejected"].includes(r.status)
-                      ? "View"
-                      : "Process"}
-                  </button>
-                  {r.status === "rejected" && (
-                    <button
-                      className="btn sm danger"
-                      disabled={!online || deleting}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        confirmDelete(r);
-                      }}
-                    >
-                      Delete
-                    </button>
-                  )}
-                </div>
-              ),
+            render: (r) => (
+              <div className="row-actions">
+                <button
+                  className="btn sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openDetail(r);
+                  }}
+                >
+                  {["completed", "rejected"].includes(r.status)
+                    ? "View"
+                    : "Process"}
+                </button>
+              </div>
+            ),
             },
           ]}
         />
@@ -682,7 +650,7 @@ export default function Requests() {
           onClose={requestClose}
           title={
             selected
-              ? `Request ${selected.id} · ${selected.first_name} ${selected.last_name}`
+              ? `Request No. REQ-${String(selected.id).padStart(4,"0")} · ${selected.first_name} ${selected.last_name}`
               : ""
           }
           size="lg"
@@ -726,8 +694,6 @@ export default function Requests() {
               online={online}
               onSubmit={submit}
               onDecide={confirmAction}
-              onDelete={confirmDelete}
-              deleting={deleting}
               onClose={requestClose}
               actionConfirm={actionConfirm}
               setActionConfirm={setActionConfirm}
@@ -772,8 +738,6 @@ function RequestPanel({
   online,
   onSubmit,
   onDecide,
-  onDelete,
-  deleting,
   onClose,
   actionConfirm,
   setActionConfirm,
@@ -794,8 +758,6 @@ function RequestPanel({
           save={save}
           online={online}
           onDecide={onDecide}
-          onDelete={() => onDelete(request)}
-          deleting={deleting}
           onClose={onClose}
         />
       ) : (
@@ -809,8 +771,6 @@ function RequestPanel({
           online={online}
           onSubmit={onSubmit}
           onDecide={onDecide}
-          onDelete={() => onDelete(request)}
-          deleting={deleting}
           onClose={onClose}
           nextActions={nextActions}
           isFinished={isFinished}
@@ -827,8 +787,6 @@ function CorrectionPanel({
   save,
   online,
   onDecide,
-  onDelete,
-  deleting,
   onClose,
 }) {
   const label =
@@ -928,13 +886,6 @@ function CorrectionPanel({
               <button className="btn" onClick={onClose}>
                 Close
               </button>
-              <button
-                className="btn danger"
-                disabled={save.busy || !online || deleting}
-                onClick={onDelete}
-              >
-                {deleting ? "Deleting…" : "Delete"}
-              </button>
             </div>
           )}
         </>
@@ -1009,8 +960,6 @@ function ItemPanel({
   online,
   onSubmit,
   onDecide,
-  onDelete,
-  deleting,
   onClose,
   nextActions,
   isFinished,
@@ -1027,14 +976,31 @@ function ItemPanel({
       (request.field_values ? JSON.parse(request.field_values) : {});
   } catch {}
   const displayFields = Object.entries(fv)
-    .filter(([k]) => k !== "beneficiary_type")
-    .map(([k, v]) => ({
-      key: k,
-      label:
-        FIELD_LABELS[k] ||
-        k.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-      value: resolveChoice(k, v, catalog) || String(v ?? "—"),
-    }));
+    .filter(
+      ([k]) => k !== "beneficiary_type" && !k.endsWith("__specify"),
+    )
+    .map(([k, v]) => {
+      // A select answered with "Other" is stored as the placeholder plus a
+      // separate `<key>__specify` value. Fold the two into one row so the
+      // panel shows only what the beneficiary typed, not a redundant field.
+      const spec = fv[`${k}__specify`];
+      const isOther = v === "other" || v === "__other__";
+      let value;
+      if (isOther) {
+        value = spec != null && String(spec).trim() !== ""
+          ? String(spec).trim()
+          : "Other";
+      } else {
+        value = resolveChoice(k, v, catalog) || String(v ?? "—");
+      }
+      return {
+        key: k,
+        label:
+          FIELD_LABELS[k] ||
+          k.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+        value,
+      };
+    });
 
   return (
     <div>
@@ -1216,15 +1182,6 @@ function ItemPanel({
         <button className="btn" onClick={onClose}>
           Close
         </button>
-        {request.status === "rejected" && (
-          <button
-            className="btn danger"
-            disabled={save.busy || !online || deleting}
-            onClick={onDelete}
-          >
-            {deleting ? "Deleting…" : "Delete"}
-          </button>
-        )}
         {showForm && (
           <button
             className="btn primary"

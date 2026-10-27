@@ -31,6 +31,7 @@ export default function Login() {
     const value = normalizeInput(mobile);
     if (value.length < 11) {
       setError('Please enter the complete 11-digit mobile number (09XXXXXXXXX)');
+      document.querySelector('.login-card input[type="tel"]')?.focus();
       return;
     }
     setBusy(true);

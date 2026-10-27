@@ -16,6 +16,7 @@ import PasswordInput from '../components/PasswordInput.jsx';
 import PasswordChecklist from '../components/PasswordChecklist.jsx';
 import { passwordProblem, passwordMatchReason, PASSWORD_MISMATCH, PASSWORD_MIN_LENGTH, PASSWORD_MAX_LENGTH } from '../lib/password.js';
 import { formatNameInput, nameProblem, displayName } from '../lib/name.js';
+import { revealFirstFieldErrorSoon } from '../lib/formErrors.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import ActionMenu from '../components/ActionMenu.jsx';
 import Icon from '../components/Icon.jsx';
@@ -243,14 +244,10 @@ export default function UserManagement() {
   };
 
   const formRef = useRef(null);
+  const pwFormRef = useRef(null);
 
   const scrollToError = useCallback(() => {
-    if (!formRef.current) return;
-    const firstError = formRef.current.querySelector('.error, [style*="border-color: rgb(220, 38, 38)"], [style*="border-color: #dc2626"]');
-    if (firstError) {
-      firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      firstError.focus?.();
-    }
+    revealFirstFieldErrorSoon(formRef.current);
   }, []);
 
   const submit = async (e) => {
@@ -368,8 +365,12 @@ export default function UserManagement() {
   const submitPassword = async (e) => {
     e.preventDefault();
     const problem = passwordProblem(pwForm.password);
-    if (problem) { setPwErrors({ password: problem }); return; }
-    if (passwordMatchReason(pwForm.password, pwForm.confirm)) { setPwErrors({ confirm: PASSWORD_MISMATCH }); return; }
+    if (problem) { setPwErrors({ password: problem }); revealFirstFieldErrorSoon(pwFormRef.current); return; }
+    if (passwordMatchReason(pwForm.password, pwForm.confirm)) {
+      setPwErrors({ confirm: PASSWORD_MISMATCH });
+      revealFirstFieldErrorSoon(pwFormRef.current);
+      return;
+    }
 
     setPwSaving(true);
     try {
@@ -379,6 +380,7 @@ export default function UserManagement() {
     } catch (err) {
       const field = err.details?.field;
       setPwErrors(field ? { [field]: err.message } : { password: err.message });
+      revealFirstFieldErrorSoon(pwFormRef.current);
     } finally {
       setPwSaving(false);
     }
@@ -737,7 +739,7 @@ export default function UserManagement() {
         onClose={() => setPwTarget(null)}
         title={pwTarget ? `Reset password · ${nameOf(pwTarget)}` : 'Reset password'}
       >
-        <form onSubmit={submitPassword}>
+        <form ref={pwFormRef} onSubmit={submitPassword}>
           <p className="muted" style={{ marginTop: 0, fontSize: 13 }}>
             The account holder signs in with this password from now on. Any session
             already open keeps working until it expires.

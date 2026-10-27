@@ -51,6 +51,7 @@ import {
   LoadingStatus,
 } from "../components/Skeleton.jsx";
 import { SelectControl } from "../reportTypes.jsx";
+import { revealFirstFieldErrorSoon } from "../lib/formErrors.js";
 
 // Labels are singular here so they read correctly as removable chips ("Farmer ×").
 // The table and detail panel pluralise where the wording is a sentence.
@@ -338,12 +339,7 @@ export default function Trainings() {
   );
 
   const scrollToError = useCallback(() => {
-    if (!formRef.current) return;
-    const firstError = formRef.current.querySelector(".error");
-    if (firstError) {
-      firstError.scrollIntoView({ behavior: "smooth", block: "center" });
-      firstError.focus?.();
-    }
+    revealFirstFieldErrorSoon(formRef.current);
   }, []);
 
   // The audience the form is currently holding, in normalised form.

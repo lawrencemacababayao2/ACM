@@ -14,7 +14,7 @@ import Field from '../components/Field.jsx';
 import PasswordInput from '../components/PasswordInput.jsx';
 import PasswordChecklist from '../components/PasswordChecklist.jsx';
 import { passwordProblem, passwordMatchReason, PASSWORD_MISMATCH } from '../lib/password.js';
-import { formatNameInput, nameProblem, displayName } from '../lib/name.js';
+import { formatName, formatNameInput, nameProblem, displayName } from '../lib/name.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import TypeBadge from '../components/TypeBadge.jsx';
 import ActionMenu from '../components/ActionMenu.jsx';
@@ -86,6 +86,20 @@ function formatRsbsaInput(raw) {
 // MIN_AGE check in mobile/src/screens/RegisterWizard.jsx, so an admin cannot save
 // a record the registration form would have refused. There is deliberately no
 // upper age cap: an older beneficiary is still a valid beneficiary.
+// The API serialises the DATE column as a full ISO timestamp
+// ("1994-10-01T00:00:00.000Z"), but the form's date input and isRealDate only
+// accept YYYY-MM-DD. Keep the calendar day the server stored by rebuilding it
+// from local date parts; slicing the ISO string would shift the day for any
+// offset west of UTC.
+function toDateOnly(value) {
+  if (!value) return '';
+  const s = String(value);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 const MIN_AGE = 18;
 
 // A birthday must be the date it claims to be, so 31 February and the like are
@@ -261,13 +275,6 @@ const [showEdit, setShowEdit] = useState(false);
   // 409. Both are blocking and rendered inline under the field they belong to.
   const [submitDupErrors, setSubmitDupErrors] = useState([]);
   const [passwordFocused, setPasswordFocused] = useState(false);
-  // Edit-mode password reset: a separate dialog, since the fields are not part of
-  // the edit form itself.
-  const [resetOpen, setResetOpen] = useState(false);
-  const [resetForm, setResetForm] = useState({ password: '', password_confirmation: '' });
-  const [resetErrors, setResetErrors] = useState({});
-  const [resetBusy, setResetBusy] = useState(false);
-  const [resetFocused, setResetFocused] = useState(false);
   const inputRefs = useRef({});
   const setInputRef = (key) => (el) => { inputRefs.current[key] = el; };
   const [total, setTotal] = useState(0);
@@ -283,7 +290,18 @@ const user = api.user();
   const draft = useFormDraft('beneficiary', editTarget?.id ?? 'new', editForm, {
     user,
     enabled: showEdit,
-    onRestore: (v) => { setEditForm({ ...emptyForm(), ...v }); setEditErrors({}); },
+    // Never persist the password pair: the add form asks the MAO to set the
+    // farmer's app password, which must not be left behind in localStorage.
+    exclude: ['password', 'password_confirmation'],
+    onRestore: (v) => {
+      const restored = { ...emptyForm(), ...v };
+      // Drafts written before the ISO birthday fix still hold the server's
+      // "1994-10-01T00:00:00.000Z" form, which the date input rejects. Normalise
+      // it on the way in so an old draft cannot keep blocking the save.
+      restored.birthday = toDateOnly(restored.birthday);
+      setEditForm(restored);
+      setEditErrors({});
+    },
   });
 
   const { beneficiaryId } = useParams();
@@ -480,7 +498,7 @@ const openEdit = (beneficiary) => {
       no_middle_name: !middle,
       last_name: beneficiary.last_name || '',
       gender: beneficiary.gender || '',
-      birthday: beneficiary.birthday || '',
+      birthday: toDateOnly(beneficiary.birthday),
       province: beneficiary.province || '',
       barangay: beneficiary.barangay || '',
       purok: beneficiary.purok || '',
@@ -568,45 +586,6 @@ const setEditValue = (key, value) => {
     setSubmitDupErrors([]);
   };
 
-  const openReset = () => {
-    setResetForm({ password: '', password_confirmation: '' });
-    setResetErrors({});
-    setResetFocused(false);
-    setResetOpen(true);
-  };
-
-  const submitReset = async (e) => {
-    if (e) e.preventDefault();
-    if (resetBusy) return;
-    const pw = resetForm.password;
-    const confirm = resetForm.password_confirmation;
-    const errs = {};
-    const problem = passwordProblem(pw);
-    if (problem) errs.password = problem;
-    if (!confirm) errs.password_confirmation = 'Please re-enter the password.';
-    else if (passwordMatchReason(pw, confirm) !== null) errs.password_confirmation = PASSWORD_MISMATCH;
-    if (Object.keys(errs).length) {
-      setResetErrors(errs);
-      return;
-    }
-    setResetBusy(true);
-    try {
-      await api.post(`/beneficiaries/${editTarget.id}/password`, {
-        password: pw,
-        password_confirmation: confirm,
-      });
-      toast('Password reset', 'ok');
-      setResetOpen(false);
-    } catch (err) {
-      const field = err.details?.field;
-      if (field) setResetErrors({ [field]: err.message });
-      else toast(err.message, 'err');
-    } finally {
-      setResetBusy(false);
-    }
-  };
-
-
   const validateForm = () => {
     const errors = {};
 
@@ -644,15 +623,20 @@ if (!isRealDate(editForm.birthday)) {
 
     // The option lists are derived from the parent, so a value that is not in
     // the current list belongs to a different parent and is refused even if
-    // something set it directly.
-    if (!provinceOptions.some((o) => o.value === editForm.province)) {
-      errors.province = 'Please select a province';
-    }
-    if (!barangayOptions.some((o) => o.value === editForm.barangay)) {
-      errors.barangay = 'Please select a barangay';
-    }
-    if (!purokOptions.some((o) => o.value === editForm.purok)) {
-      errors.purok = 'Please select a purok';
+    // something set it directly. Only enforce this once the option tree has
+    // loaded; if that request failed or is still in flight the server's own
+    // province/barangay/purok check is the source of truth, rather than blocking
+    // every save because the browser has no options to compare against.
+    if (locationData) {
+      if (!provinceOptions.some((o) => o.value === editForm.province)) {
+        errors.province = 'Please select a province';
+      }
+      if (!barangayOptions.some((o) => o.value === editForm.barangay)) {
+        errors.barangay = 'Please select a barangay';
+      }
+      if (!purokOptions.some((o) => o.value === editForm.purok)) {
+        errors.purok = 'Please select a purok';
+      }
     }
 
     const rsbsa = editForm.rsbsa_number.replace(/\D/g, '');
@@ -696,9 +680,23 @@ const mobile = editForm.mobile_number.replace(/\D/g, '');
       inputRefs.current[field]?.focus?.();
     } else if (field === 'mobile_number') {
       inputRefs.current.mobile_number?.focus?.();
-    } else {
+    } else if (field === 'rsbsa_number') {
       inputRefs.current.rsbsa_number?.focus?.();
     }
+  };
+
+  // A refused save must point at the problem instead of looking ignored: bring
+  // the field's inline error into view and focus its control. No toast is used,
+  // so the user's attention stays on the input that needs fixing.
+  const revealFieldError = (field, message) => {
+    setTimeout(() => {
+      const body = document.querySelector('.modal-body');
+      if (!body) return;
+      const spans = Array.from(body.querySelectorAll('span.error'));
+      const target = (message && spans.find((el) => el.textContent.trim() === message)) || spans[0];
+      target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      focusFirstError(field);
+    }, 60);
   };
 
   const handleEditSubmit = async (e) => {
@@ -708,12 +706,18 @@ const mobile = editForm.mobile_number.replace(/\D/g, '');
     const validationErrors = validateForm();
     if (Object.keys(validationErrors).length > 0) {
       setEditErrors(validationErrors);
+      const first = Object.keys(validationErrors)[0];
+      revealFieldError(first, validationErrors[first]);
       return;
     }
 
     // An unresolved duplicate always stops the save here, even when the submit
-    // button was reached through the keyboard instead of a click.
-    if (dupBlocked) return;
+    // button was reached through the keyboard instead of a click. Point at the
+    // inline duplicate message rather than returning silently.
+    if (dupBlocked) {
+      revealFieldError(dupErrors[0]?.field, dupErrors[0]?.message);
+      return;
+    }
 
     const type = editForm.beneficiary_type;
     const middle = editForm.no_middle_name ? null : formatName(editForm.middle_name);
@@ -759,13 +763,14 @@ const mobile = editForm.mobile_number.replace(/\D/g, '');
           : (details.field ? [{ field: details.field, message: details.error }] : []);
         setSubmitDupErrors(errors);
         // Scroll/focus the first conflicted field and keep the modal open.
-        if (errors[0]?.field) setTimeout(() => focusFirstError(errors[0].field), 80);
+        if (errors[0]?.field) revealFieldError(errors[0].field, errors[0].message);
         return;
       }
       if (save.error?.kind === 'validation') {
         const field = save.error.details?.field;
         if (field && field in editForm) {
           setEditErrors((prev) => ({ ...prev, [field]: save.error.message }));
+          revealFieldError(field, save.error.message);
         } else {
           toast(save.error.message, 'err');
         }
@@ -1058,7 +1063,7 @@ const setStatusOf = async (beneficiary, nextStatus) => {
         meta={filtered ? `Showing ${rows.length} of ${total} results` : `${total} ${total === 1 ? 'beneficiary' : 'beneficiaries'}`}
         metaLoading={loading}
         actions={(
-          <button type="button" className="btn-pill btn-pill-export" onClick={handleExport} disabled={exporting}>
+          <button type="button" className="btn export-pdf" onClick={handleExport} disabled={exporting}>
             <Icon name="download" size={14} />
             {exporting ? 'Preparing…' : 'Export PDF'}
           </button>
@@ -1218,11 +1223,20 @@ const setStatusOf = async (beneficiary, nextStatus) => {
         footer={
           <div className="modal-footer-actions">
             {!online && <span className="muted">Waiting for connection…</span>}
-            {!isAdd && editTarget?.user_id && (
-              <button className="btn" type="button" onClick={openReset} disabled={save.busy}>Reset password</button>
-            )}
+            {dupBlocked && <span className="muted">Resolve the duplicate fields first.</span>}
             <button className="btn" type="button" onClick={requestClose} disabled={save.busy}>Cancel</button>
-            <button className="btn primary" type="button" onClick={handleEditSubmit} disabled={save.busy || !online || dupBlocked}>
+            <button
+              className="btn primary"
+              type="button"
+              onClick={handleEditSubmit}
+              disabled={save.busy || !online || dupBlocked}
+              title={
+                save.busy ? 'Please wait…'
+                  : !online ? 'Waiting for the server to come back…'
+                    : dupBlocked ? 'Fix the duplicated fields above first'
+                      : undefined
+              }
+            >
               {save.busy ? 'Saving…' : isAdd ? 'Add beneficiary' : 'Save changes'}
             </button>
           </div>
@@ -1455,50 +1469,6 @@ const setStatusOf = async (beneficiary, nextStatus) => {
                 onChange={(v) => setEditValue('status', v)}
               />
               {editErrors.status && <span className="error">{editErrors.status}</span>}
-            </Field>
-          </div>
-        </form>
-      </Modal>
-
-      <Modal
-        open={resetOpen}
-        title="Reset password"
-        onClose={() => { if (!resetBusy) setResetOpen(false); }}
-        footer={
-          <div className="modal-footer-actions">
-            <button className="btn" type="button" onClick={() => setResetOpen(false)} disabled={resetBusy}>Cancel</button>
-            <button className="btn primary" type="button" onClick={submitReset} disabled={resetBusy}>
-              {resetBusy ? 'Saving…' : 'Reset password'}
-            </button>
-          </div>
-        }
-      >
-        <form onSubmit={submitReset}>
-          <p className="muted" style={{ marginTop: 0 }}>
-            Set a new password for this beneficiary&rsquo;s app account. Any device already signed in will be logged out.
-          </p>
-          <div className="form-grid">
-            <Field label="New Password" required col2 error={Boolean(resetErrors.password)}>
-              <PasswordInput
-                value={resetForm.password}
-                onChange={(e) => { setResetForm((p) => ({ ...p, password: e.target.value })); setResetErrors((p) => ({ ...p, password: undefined })); }}
-                onFocus={() => setResetFocused(true)}
-                onBlur={() => setResetFocused(false)}
-                invalid={Boolean(resetErrors.password)}
-                placeholder="Enter a password"
-                autoComplete="new-password"
-              />
-              {(resetFocused || resetErrors.password) && <PasswordChecklist value={resetForm.password} />}
-              {resetErrors.password && <span className="error">{resetErrors.password}</span>}
-            </Field>
-            <Field label="Confirm Password" required col2 error={Boolean(resetErrors.password_confirmation)}>
-              <PasswordInput
-                value={resetForm.password_confirmation}
-                onChange={(e) => { setResetForm((p) => ({ ...p, password_confirmation: e.target.value })); setResetErrors((p) => ({ ...p, password_confirmation: undefined })); }}
-                placeholder="Re-enter the password"
-                autoComplete="new-password"
-              />
-              {resetErrors.password_confirmation && <span className="error">{resetErrors.password_confirmation}</span>}
             </Field>
           </div>
         </form>

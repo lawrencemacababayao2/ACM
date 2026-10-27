@@ -63,11 +63,22 @@ export default function useRecordFilters(rows, {
 
   const matches = useCallback((row, { term, wantStatus, vals, from, to }) => {
     if (term) {
-      const needle = term.trim().toLowerCase();
-      const hit = searchFields.some((f) => {
-        const v = row?.[f];
-        return v != null && String(v).toLowerCase().includes(needle);
-      });
+          const needle = term.trim().toLowerCase();
+          const hit = searchFields.some((f) => {
+            const v = row?.[f];
+            if (v == null) return false;
+            const str = String(v).toLowerCase();
+            if (str.includes(needle)) return true;
+            if (f === "id") {
+              const num = String(v);
+              if (num === needle) return true;
+              const digits = needle.replace(/[^0-9]/g, "");
+              if (digits && num === digits) return true;
+              if (digits && num.padStart(4, "0") === digits.padStart(4, "0")) return true;
+              if (needle.startsWith("req-") && num.padStart(4, "0") === needle.slice(4).replace(/[^0-9]/g, "").padStart(4, "0")) return true;
+            }
+            return false;
+          });
       if (!hit) return false;
     }
     if (!withinRange(row?.[dateField], from, to)) return false;

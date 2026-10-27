@@ -344,6 +344,21 @@ input, select, textarea { font: inherit; }
 .btn.ghost:hover { background: rgba(255, 255, 255, .08); color: #fff; }
 .btn.danger { background: #fff; border-color: #fecaca; color: var(--danger); }
 .btn.danger:hover { background: #fef2f2; }
+/* Export actions keep their colour at rest instead of only tinting on hover:
+   PDF is always red and CSV always green, on the same rectangle as every other
+   .btn so the two exports match across pages. */
+.btn.export-pdf {
+  background: var(--danger-soft); border-color: rgba(220, 38, 38, .28);
+  color: var(--danger); box-shadow: none;
+}
+.btn.export-pdf:hover { background: #fbdada; border-color: var(--danger); color: var(--danger); }
+.btn.export-csv {
+  background: var(--green-soft); border-color: rgba(24, 139, 93, .28);
+  color: var(--green-dark); box-shadow: none;
+}
+.btn.export-csv:hover { background: #d4e9df; border-color: var(--green); color: var(--green-dark); }
+.btn.export-pdf:disabled:hover,
+.btn.export-csv:disabled:hover { opacity: .5; }
 .btn.sm { padding: 5px 10px; font-size: 12.5px; border-radius: 8px; }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 .icon-btn {
@@ -516,7 +531,7 @@ a.dash-kpi:focus-visible { outline: 2px solid var(--green); outline-offset: 2px;
 }
 .dash-pill.scheduled { color: #1D4ED8; }
 .dash-pill.rejected { color: #B42318; }
-.dash-pill.pending { color: #7A4E00; }
+.dash-pill.pending { color: #ca8a04; }
 .dash-pill.completed { color: #146C43; }
 .dash-pill.approved { color: #0F766E; }
 .dash-pill.in_progress { color: #5B34C9; }

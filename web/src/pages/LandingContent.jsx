@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   DndContext,
   KeyboardSensor,
@@ -34,6 +34,7 @@ import PageHeader from '../components/PageHeader.jsx';
 import ActionMenu from '../components/ActionMenu.jsx';
 import CustomSelect from '../components/CustomSelect.jsx';
 import { TableSkeleton, ListSkeleton, useSkeletonVisible, LoadingStatus } from '../components/Skeleton.jsx';
+import { revealFirstFieldErrorSoon } from '../lib/formErrors.js';
 
 const SECTIONS = [
   { key: 'carousel', label: 'Hero Slides', desc: 'Image + caption slides on the landing hero' },
@@ -162,9 +163,9 @@ function applyVisibleReorder(full, visibleIds, fromIndex, toIndex) {
   return resequence(full.map((r) => (visible.has(r.id) ? byId.get(queued.shift()) : r)));
 }
 
-function LField({ label, col2, required, children }) {
+function LField({ label, col2, required, error, children }) {
   return (
-    <div className={`field ${col2 ? 'field-col2' : ''}`}>
+    <div className={`field ${col2 ? 'field-col2' : ''} ${error ? 'error' : ''}`.trim()}>
       <span>{label}{required ? ' *' : ''}</span>
       {children}
     </div>
@@ -287,6 +288,10 @@ export default function LandingContent() {
   const [slideForm, setSlideForm] = useState(EMPTY_SLIDE);
   const [uploading, setUploading] = useState(false);
   const [slideError, setSlideError] = useState('');
+  const [slideTitleError, setSlideTitleError] = useState('');
+  const [slideCategoryError, setSlideCategoryError] = useState('');
+  const slideFormRef = useRef(null);
+  const contactFormRef = useRef(null);
   const [itemErrors, setItemErrors] = useState({});
   const [uploadingImg, setUploadingImg] = useState(null);
   const [togglingId, setTogglingId] = useState(null);
@@ -301,6 +306,7 @@ export default function LandingContent() {
   const [faqForm, setFaqForm] = useState(EMPTY_FAQ);
 
   const [contactData, setContactData] = useState({ heading: '', title: '', address: '', hours: '', phone: '', email: '' });
+  const [contactErrors, setContactErrors] = useState({});
   const [faqSearch, setFaqSearch] = useState('');
 
   // Each publish surface has its own submit hook so a failure on one never paints
@@ -398,6 +404,7 @@ export default function LandingContent() {
       setContactData((data && typeof data === 'object' && !Array.isArray(data))
         ? { heading: '', title: '', address: '', hours: '', phone: '', email: '', ...data }
         : { heading: '', title: '', address: '', hours: '', phone: '', email: '' });
+      setContactErrors({});
       setDirty(false);
     } catch (err) { toast(err.message, 'err'); }
     finally { setLoading(false); }
@@ -633,8 +640,11 @@ export default function LandingContent() {
       for (const { i, f } of missing) nextErrors[`${i}:${f}`] = 'This field is required';
       setItemErrors(nextErrors);
       setOpenItem(missing[0].i);
-      const { i } = missing[0];
-      setTimeout(() => document.getElementById(`landing-item-${i}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 0);
+      const { i, f } = missing[0];
+      revealFirstFieldErrorSoon(
+        () => document.getElementById(`landing-item-${i}`),
+        nextErrors[`${i}:${f}`],
+      );
       return;
     }
     if (section === 'services') {
@@ -654,7 +664,10 @@ export default function LandingContent() {
         setItemErrors(pointError);
         const i = Number(Object.keys(pointError)[0].split(':')[0]);
         setOpenItem(i);
-        setTimeout(() => document.getElementById(`landing-item-${i}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 0);
+        revealFirstFieldErrorSoon(
+          () => document.getElementById(`landing-item-${i}`),
+          pointError[`${i}:points`],
+        );
         return;
       }
     }
@@ -677,6 +690,7 @@ export default function LandingContent() {
   const setContact = (k) => (e) => {
     const v = CONTACT_TEXT_FIELDS.includes(k) ? applyCapitalizeFirst(e.target) : e.target.value;
     setContactData({ ...contactData, [k]: v });
+    setContactErrors((prev) => (prev[k] ? { ...prev, [k]: undefined } : prev));
     setDirty(true);
   };
 
@@ -684,9 +698,12 @@ export default function LandingContent() {
     if (contactSave.busy) return;
     const missing = Object.keys(contactData).find((k) => !String(contactData[k] || '').trim());
     if (missing) {
-      toast(`"${CONTACT_LABELS[missing] || missing}" is required`, 'err');
+      const message = `"${CONTACT_LABELS[missing] || missing}" is required`;
+      setContactErrors({ [missing]: message });
+      revealFirstFieldErrorSoon(contactFormRef.current, message);
       return;
     }
+    setContactErrors({});
     setDirty(false);
     (async () => {
       try {
@@ -722,15 +739,28 @@ export default function LandingContent() {
       ? Math.max(0, Number(e.target.value) || 0)
       : (k === 'title' ? applyCapitalizeFirst(e.target) : e.target.value);
     setSlideForm({ ...slideForm, [k]: v });
+    if (k === 'title') setSlideTitleError('');
+    if (k === 'category') setSlideCategoryError('');
   };
 
   const openAddSlide = () => {
     setEditSlide(null);
     setSlideForm({ ...EMPTY_SLIDE, sort_order: Math.max(-1, ...slides.map((s) => Number(s.sort_order) || 0)) + 1 });
+    setSlideError('');
+    setSlideTitleError('');
+    setSlideCategoryError('');
     slideSave.resetKey();
     setSlideOpen(true);
   };
-  const openEditSlide = (r) => { setEditSlide(r); setSlideForm({ ...r }); slideSave.resetKey(); setSlideOpen(true); };
+  const openEditSlide = (r) => {
+    setEditSlide(r);
+    setSlideForm({ ...r });
+    setSlideError('');
+    setSlideTitleError('');
+    setSlideCategoryError('');
+    slideSave.resetKey();
+    setSlideOpen(true);
+  };
 
   const uploadSlideImage = async (file) => {
     if (!file) return;
@@ -769,11 +799,22 @@ export default function LandingContent() {
     if (e) e.preventDefault();
     if (slideSave.busy) return;
     if (uploading) { toast('Image is still uploading — wait a moment', 'err'); return; }
-    if (!slideForm.image_url) { toast('Please upload a slide image first', 'err'); return; }
     const title = capitalizeFirst(String(slideForm.title || '').trim());
     const category = String(slideForm.category || '').trim();
-    if (!title) { toast('Caption is required', 'err'); return; }
-    if (!category) { toast('Category is required', 'err'); return; }
+    const slideProblems = {};
+    if (!slideForm.image_url) slideProblems.image = 'Please upload a slide image first';
+    if (!title) slideProblems.title = 'Caption is required';
+    if (!category) slideProblems.category = 'Category is required';
+    if (Object.keys(slideProblems).length) {
+      setSlideError(slideProblems.image || '');
+      setSlideTitleError(slideProblems.title || '');
+      setSlideCategoryError(slideProblems.category || '');
+      revealFirstFieldErrorSoon(slideFormRef.current, slideProblems.image || slideProblems.title || slideProblems.category);
+      return;
+    }
+    setSlideError('');
+    setSlideTitleError('');
+    setSlideCategoryError('');
     const tempId = `tmp-${Date.now()}`;
     const draft = { ...slideForm, id: editSlide ? editSlide.id : tempId, title, category, status: slideForm.status || 'active' };
     if (editSlide) {
@@ -1150,7 +1191,7 @@ export default function LandingContent() {
           )}
 
           <Modal open={slideOpen} onClose={requestCloseSlide} title={editSlide ? 'Edit slide' : 'New slide'}>
-            <form onSubmit={submitSlide}>
+            <form ref={slideFormRef} onSubmit={submitSlide}>
               <DraftNotice savedAt={slideDraft.savedAt} restoredAt={slideDraft.restoredAt} onDiscard={() => { slideDraft.clear(); setSlideForm({ ...EMPTY_SLIDE }); }} />
               <FormError error={slideSave.error} onRetry={() => { void submitSlide(); }} />
               <Field label="Slide image *" hint="Upload a photo shown on the landing website hero" error={Boolean(slideError)}>
@@ -1180,16 +1221,18 @@ export default function LandingContent() {
                 </div>
                 {slideError && <span className="error">{slideError}</span>}
               </Field>
-              <Field label="Caption" required hint="The text displayed on top of the image">
+              <Field label="Caption" required hint="The text displayed on top of the image" error={Boolean(slideTitleError)}>
                 <textarea value={slideForm.title} onChange={setSlide('title')} rows={3} required placeholder="e.g. Free vaccination drive for livestock — July 30, municipal gym" data-capitalize="true" />
+                {slideTitleError && <span className="error">{slideTitleError}</span>}
               </Field>
-              <Field label="Category" required hint="Tag shown above the caption">
+              <Field label="Category" required hint="Tag shown above the caption" error={Boolean(slideCategoryError)}>
                 <CustomSelect
                 value={slideForm.category}
                 onChange={setSlide('category')}
                 required
                 options={["Rice", "Crops", "Livestock", "Fisheries", "Training", "Services", "Programs", "Agriculture"]}
               />
+                {slideCategoryError && <span className="error">{slideCategoryError}</span>}
               </Field>
               <Field label="Status">
                 <CustomSelect
@@ -1283,17 +1326,35 @@ export default function LandingContent() {
         </div>
       ) : isContact ? (
         <div className="landing-section">
-          <div className="card landing-form-card">
+          <div className="card landing-form-card" ref={contactFormRef}>
             <div className="landing-form-card-head">
               <strong>Contact details</strong>
             </div>
             <div className="grid2">
-              <LField label="Eyebrow" required><textarea rows={1} value={contactData.heading || ''} onChange={setContact('heading')} data-capitalize="true" /></LField>
-              <LField label="Title" required><textarea rows={1} value={contactData.title || ''} onChange={setContact('title')} data-capitalize="true" /></LField>
-              <LField label="Address" col2 required><input value={contactData.address || ''} onChange={setContact('address')} data-capitalize="true" /></LField>
-              <LField label="Office Hours" required><input value={contactData.hours || ''} onChange={setContact('hours')} data-capitalize="true" /></LField>
-              <LField label="Phone" required><input value={contactData.phone || ''} onChange={setContact('phone')} /></LField>
-              <LField label="Email" col2 required><textarea rows={1} value={contactData.email || ''} onChange={setContact('email')} /></LField>
+              <LField label="Eyebrow" required error={Boolean(contactErrors.heading)}>
+                <textarea rows={1} value={contactData.heading || ''} onChange={setContact('heading')} data-capitalize="true" />
+                {contactErrors.heading && <span className="error">{contactErrors.heading}</span>}
+              </LField>
+              <LField label="Title" required error={Boolean(contactErrors.title)}>
+                <textarea rows={1} value={contactData.title || ''} onChange={setContact('title')} data-capitalize="true" />
+                {contactErrors.title && <span className="error">{contactErrors.title}</span>}
+              </LField>
+              <LField label="Address" col2 required error={Boolean(contactErrors.address)}>
+                <input value={contactData.address || ''} onChange={setContact('address')} data-capitalize="true" />
+                {contactErrors.address && <span className="error">{contactErrors.address}</span>}
+              </LField>
+              <LField label="Office Hours" required error={Boolean(contactErrors.hours)}>
+                <input value={contactData.hours || ''} onChange={setContact('hours')} data-capitalize="true" />
+                {contactErrors.hours && <span className="error">{contactErrors.hours}</span>}
+              </LField>
+              <LField label="Phone" required error={Boolean(contactErrors.phone)}>
+                <input value={contactData.phone || ''} onChange={setContact('phone')} />
+                {contactErrors.phone && <span className="error">{contactErrors.phone}</span>}
+              </LField>
+              <LField label="Email" col2 required error={Boolean(contactErrors.email)}>
+                <textarea rows={1} value={contactData.email || ''} onChange={setContact('email')} />
+                {contactErrors.email && <span className="error">{contactErrors.email}</span>}
+              </LField>
             </div>
           </div>
           <FormError error={contactSave.error} onRetry={() => { void saveContact(); }} />

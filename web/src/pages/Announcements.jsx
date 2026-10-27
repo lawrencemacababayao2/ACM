@@ -20,6 +20,7 @@ import StatusTabs from '../components/StatusTabs.jsx';
 import PageHeader from '../components/PageHeader.jsx';
 import RecordToolbar, { DateRangeFilter } from '../components/RecordToolbar.jsx';
 import useRecordFilters from '../lib/useRecordFilters.js';
+import { revealFirstFieldErrorSoon } from '../lib/formErrors.js';
 import FilterPill from '../components/FilterPill.jsx';
 import TypeMultiSelect from '../components/TypeMultiSelect.jsx';
 import { normalizeTypes, FILTER_TARGET_OPTIONS, ANNOUNCEMENT_FILTER_OPTIONS } from '../lib/targetTypes.js';
@@ -168,12 +169,7 @@ const openAdd = () => { setEditing(null); setForm(EMPTY); setFormErrors(null); s
   const fieldError = (k) => formErrors?.[k];
 
   const scrollToError = useCallback(() => {
-    if (!formRef.current) return;
-    const firstError = formRef.current.querySelector('.error');
-    if (firstError) {
-      firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      firstError.focus?.();
-    }
+    revealFirstFieldErrorSoon(formRef.current);
   }, []);
 
   // Closing the modal keeps the draft so the user can resume; it only confirms
