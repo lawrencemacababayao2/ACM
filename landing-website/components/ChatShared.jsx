@@ -161,6 +161,19 @@ export function useAssistant(lang, bis) {
     }
   };
 
+  // Once the visitor starts the conversation, the FAQ suggestion chips are no
+  // longer useful and take space away from the messages, so hide them.
+  const started = messages.some((m) => m.role === "user");
+
   // Consumers disable the compose box with `blocked` (busy OR cooling down).
-  return { messages, input, setInput, busy, blocked: busy || cooldown > 0, cooldown, suggestions, send };
+  return {
+    messages,
+    input,
+    setInput,
+    busy,
+    blocked: busy || cooldown > 0,
+    cooldown,
+    suggestions: started ? [] : suggestions,
+    send,
+  };
 }
