@@ -1621,32 +1621,6 @@ a.dash-kpi:focus-visible { outline: 2px solid var(--green); outline-offset: 2px;
 }
 
 
-/* ---------- Brand motif ---------- */
-/* Original "circuit tree" illustration, fixed to the bottom-right corner.
-   z-index -1 puts it in the negative stacking layer: it paints above the page
-   background but behind every card, table, badge and button. pointer-events is
-   off so it can never intercept a click, and being fixed + out of flow it adds
-   no height and never scrolls. */
-/* Decorative bottom-right background mark. The PNG is square and transparent at
-   the corners, so only the width is set; the height follows from the aspect
-   ratio. z-index -1 keeps it behind the cards, and pointer-events none keeps it
-   from swallowing clicks on whatever sits under it.
-
-   `bottom` is pushed well past the viewport edge on purpose: the artwork is a
-   tree whose trunk occupies roughly the bottom 14% of the square, so letting
-   about a sixth of the box hang below the fold leaves only a short stub of trunk
-   showing and lets the canopy sit inside the page. */
-.brand-motif {
-    position: fixed;
-    right: -56px;
-    bottom: -65px;
-    width: 380px;
-    z-index: -1;
-    pointer-events: none;
-    opacity: .07;
-    user-select: none;
-  }
-  .brand-motif img { display: block; width: 100%; height: auto; }
 
 .btn.lg { padding: 12px 16px; min-height: 44px; font-size: 14px; }
 .text-badge { font-weight: 600; font-size: 13px; }

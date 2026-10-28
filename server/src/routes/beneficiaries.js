@@ -9,6 +9,7 @@ import { validateMobile } from '../services/otp.js';
 import { checkBeneficiaryDuplicateFields, checkUserDuplicates, duplicateErrors } from '../services/duplicates.js';
 import { passwordProblem, passwordMatchReason } from '../lib/password.js';
 import { nameProblem, formatName } from '../lib/name.js';
+import { sendOne } from '../services/sms.js';
 
 // Mirrors the messages used by POST /api/auth/register for the same two failures,
 // so a bad number reads identically whichever way it was submitted.
@@ -433,7 +434,7 @@ router.put('/:id', auth, adminOnly, idempotent(), wrap(async (req, res) => {
   // the record as it will be after this save (body values over existing ones).
   const [existing] = await pool.query(
     'SELECT id, user_id, first_name, middle_name, last_name, suffix, birthday, rsbsa_number, ' +
-    'contact_number, province, barangay, purok FROM beneficiaries WHERE id = ?',
+    "contact_number, province, barangay, purok, status FROM beneficiaries WHERE id = ?",
     [req.params.id]
   );
   if (!existing[0]) throw new HttpError(404, 'Beneficiary not found');
@@ -550,6 +551,37 @@ router.put('/:id', auth, adminOnly, idempotent(), wrap(async (req, res) => {
     );
     if (userDup) throw new HttpError(409, userDup.message, { field: userDup.field });
     await pool.query('UPDATE users SET mobile_number = ? WHERE id = ?', [mobileValue, existing[0].user_id]);
+  }
+
+  // Tell the beneficiary when their account is verified or rejected. This only
+  // fires on the actual transition, so saving the same status again does not
+  // send a second SMS. A messaging failure must never fail the status change.
+  const statusChanged = changes.status && changes.status !== existing[0].status;
+  if (statusChanged && (changes.status === 'verified' || changes.status === 'rejected')) {
+    const phone = changes.contact_number || existing[0].contact_number;
+    if (phone) {
+      const verified = changes.status === 'verified';
+      const fullName = [
+        changes.first_name ?? existing[0].first_name,
+        changes.last_name ?? existing[0].last_name,
+      ].filter(Boolean).join(' ') || 'Beneficiary';
+      try {
+        await sendOne({
+          phone,
+          beneficiaryId: Number(req.params.id),
+          subject: verified ? 'ACM: Account Verified' : 'ACM: Registration Rejected',
+          subjectBis: verified ? 'ACM: Verified na ang Account' : 'ACM: Gisalikway ang Rehistro',
+          message: verified
+            ? `Hi ${fullName}, your beneficiary account has been verified. You can now submit requests through the AgriConnect Medina app.`
+            : `Hi ${fullName}, your beneficiary registration was rejected. Please contact the Municipal Agriculture Office for details.`,
+          messageBis: verified
+            ? `Hi ${fullName}, verified na ang imong beneficiary account. Makahimo na ka og hangyo pinaagi sa AgriConnect Medina app.`
+            : `Hi ${fullName}, gisalikway ang imong rehistro isip beneficiary. Palihug kontaka ang Municipal Agriculture Office alang sa detalye.`,
+        });
+      } catch (err) {
+        console.error('[sms] beneficiary status notice failed:', err?.message || err);
+      }
+    }
   }
   res.json({ ok: true });
 }));

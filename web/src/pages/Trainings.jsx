@@ -52,6 +52,7 @@ import {
 } from "../components/Skeleton.jsx";
 import { SelectControl } from "../reportTypes.jsx";
 import { revealFirstFieldErrorSoon } from "../lib/formErrors.js";
+import { exportTablePdf, pdfFileStamp } from "../lib/exportTablePdf.js";
 
 // Labels are singular here so they read correctly as removable chips ("Farmer ×").
 // The table and detail panel pluralise where the wording is a sentence.
@@ -110,10 +111,37 @@ function fmtDate(v) {
   });
 }
 
+// PDF copy needs plain text: the on-screen badges cannot be drawn by autoTable.
+const TARGET_LABELS = {
+  all: "All registered groups",
+  ...Object.fromEntries(FORM_TARGET_OPTIONS.map((o) => [o.value, o.label])),
+};
+
+function targetLabel(value) {
+  const list = normalizeTypes(value);
+  return list.length ? list.map((v) => TARGET_LABELS[v] || v).join(", ") : "N/A";
+}
+
+function scheduleLabel(r) {
+  if (!r.schedule) return "N/A";
+  const start = String(r.schedule);
+  // Trainings use end_at if available, otherwise fall back to end_time on the same day.
+  const end = r.end_at
+    ? String(r.end_at)
+    : r.event_date && r.end_time
+      ? `${String(r.event_date).slice(0, 10)} ${String(r.end_time).slice(0, 8)}`
+      : null;
+  const startDay = start.slice(0, 10);
+  const endDay = end ? end.slice(0, 10) : null;
+  if (endDay && startDay !== endDay) return `${fmtDate(start)} - ${fmtDate(end)}`;
+  return fmtDate(start) || "N/A";
+}
+
 export default function Trainings() {
   const toast = useToast();
   const [all, setAll] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const skeleton = useSkeletonVisible(loading);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -209,6 +237,38 @@ export default function Trainings() {
     }
     return out;
   }, [filters.filtered, filters.status]);
+
+  const exportPdf = async () => {
+    setExporting(true);
+    try {
+      const head = ["Title", "Target", "Venue", "Schedule", "Status", "Published", "Created", "SMS"];
+      const body = rows.map((r) => [
+        capitalizeFirst(r.title) || "N/A",
+        targetLabel(r.target_beneficiary_types ?? r.target_type),
+        r.venue || "N/A",
+        scheduleLabel(r),
+        capitalizeFirst(String(r.phase || "")) || "N/A",
+        r.published_at ? fmtDate(r.published_at) : "N/A",
+        fmtDate(r.created_at) || "N/A",
+        r.send_sms ? "On" : "Off",
+      ]);
+      const filename = `trainings-${pdfFileStamp()}.pdf`;
+      const result = await exportTablePdf({
+        title: "Training & Seminar Records",
+        filename,
+        head,
+        body,
+        footerLabel: `${rows.length} ${rows.length === 1 ? "training" : "trainings"}`,
+      });
+      if (result.cancelled) return;
+      toast(`PDF saved - ${result.filename}`, "ok");
+    } catch (err) {
+      console.error("PDF export failed:", err);
+      toast(`Could not generate the PDF: ${err?.message || err}`, "err");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   // Clicking the active column flips direction; a new column starts ascending.
   const handleSort = (key) => {
@@ -531,9 +591,18 @@ export default function Trainings() {
         onChange={filters.setStatus}
         countsLoading={loading}
         actions={
-          <button className="btn primary" onClick={openAdd}>
-            <Icon name="plus" size={15} /> New training & Seminar
-          </button>
+          <>
+            <button
+              className="btn export-pdf"
+              onClick={exportPdf}
+              disabled={exporting || !rows.length}
+            >
+              <Icon name="download" size={15} /> {exporting ? "Preparing..." : "Export PDF"}
+            </button>
+            <button className="btn primary" onClick={openAdd}>
+              <Icon name="plus" size={15} /> New training & Seminar
+            </button>
+          </>
         }
       />
 

@@ -457,7 +457,12 @@ router.post('/:id/reject', auth, adminOnly, idempotent(), wrap(async (req, res) 
   const [rows] = await pool.query(`${JOIN} WHERE r.id = ?`, [req.params.id]);
   const reqRow = rows[0];
   if (!reqRow) throw new HttpError(404, 'Request not found');
-  if (reqRow.status !== 'pending') throw new HttpError(400, 'This request has already been decided');
+  // A pending request can be rejected, and so can an approved item request that
+  // has not been scheduled yet (approved -> rejected is part of the flow).
+  // Profile corrections are still decided once and cannot be rejected later.
+  const rejectable = reqRow.status === 'pending' ||
+    (reqRow.status === 'approved' && reqRow.type !== 'profile_correction');
+  if (!rejectable) throw new HttpError(400, 'This request has already been decided');
 
   const reason = req.body?.reason ? capitalizeFirst(String(req.body.reason).trim()) : null;
   await pool.query(

@@ -3,7 +3,6 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { api, mediaUrl } from "../api.js";
 import { useToast } from "../toast.jsx";
 import Icon from "./Icon.jsx";
-import BrandMotif from "./BrandMotif.jsx";
 import ConnectionBanner from "./ConnectionBanner.jsx";
 import { isReportsArea, reportCategoriesFor, activeReportCategory, REPORTS_LABEL } from "../reportCategories.js";
 
@@ -413,7 +412,6 @@ export default function Layout() {
         </div>
       </aside>
       <main className="content">
-        <BrandMotif />
         <div className="app-bar">
           <button
             type="button"

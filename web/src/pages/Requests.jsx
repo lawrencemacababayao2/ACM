@@ -15,6 +15,7 @@ import Field from "../components/Field.jsx";
 import DatePicker from "../components/DatePicker.jsx";
 import StatusBadge from "../components/StatusBadge.jsx";
 import StatusTabs from "../components/StatusTabs.jsx";
+import Icon from "../components/Icon.jsx";
 import RecordToolbar, {
   DateRangeFilter,
 } from "../components/RecordToolbar.jsx";
@@ -22,6 +23,8 @@ import FilterPill from "../components/FilterPill.jsx";
 import PageHeader from "../components/PageHeader.jsx";
 import useRecordFilters from "../lib/useRecordFilters.js";
 import { toISO } from "../lib/dateUtils.js";
+import { revealFirstFieldErrorSoon } from "../lib/formErrors.js";
+import { exportTablePdf, pdfFileStamp } from "../lib/exportTablePdf.js";
 import {
   TableSkeleton,
   useSkeletonVisible,
@@ -212,6 +215,8 @@ export default function Requests() {
     admin_notes: "",
   });
   const [rejectReason, setRejectReason] = useState("");
+  const [rejectError, setRejectError] = useState("");
+  const [exporting, setExporting] = useState(false);
   const [lastAction, setLastAction] = useState("approve");
   const [closeConfirm, setCloseConfirm] = useState(null);
   const [actionConfirm, setActionConfirm] = useState(null);
@@ -322,6 +327,7 @@ export default function Requests() {
       admin_notes: r.admin_notes || "",
     });
     setRejectReason("");
+    setRejectError("");
     save.resetKey();
     try {
       const detail = await api.get(`/requests/${r.id}`);
@@ -365,9 +371,9 @@ export default function Requests() {
   const decide = async (action) => {
     if (save.busy || !selected) return;
     if (action === "reject" && !rejectReason.trim()) {
-      const el = document.querySelector(".modal-body textarea");
-      el?.scrollIntoView({ behavior: "smooth", block: "center" });
-      el?.focus();
+      const message = "Please enter a reason for rejecting this request.";
+      setRejectError(message);
+      revealFirstFieldErrorSoon(undefined, message);
       return;
     }
     console.log("[decide]", action, selected.id);
@@ -393,6 +399,7 @@ export default function Requests() {
     );
     setSelected(null);
     setRejectReason("");
+    setRejectError("");
     load();
   };
 
@@ -466,6 +473,47 @@ export default function Requests() {
     return [...pending, ...others];
   }, [defaultSort, sortKey]);
 
+  const exportPdf = async () => {
+    setExporting(true);
+    try {
+      const head = [
+        "Request No.",
+        "Beneficiary",
+        "Request",
+        "Beneficiary type",
+        "Barangay",
+        "Mobile No.",
+        "Status",
+        "Submitted",
+      ];
+      const body = sortedRows.map((r) => [
+        r.id == null ? "N/A" : `REQ-${String(r.id).padStart(4, "0")}`,
+        r.name || `${r.first_name || ""} ${r.last_name || ""}`.trim() || "N/A",
+        itemLabel(r),
+        BEN_TYPE_LABELS[r.beneficiary_type || r.category] || r.beneficiary_type || r.category || "N/A",
+        r.barangay || "N/A",
+        r.contact_number || "N/A",
+        capitalizeFirst(String(r.status || "").replace(/_/g, " ")) || "N/A",
+        r.created_at ? formatDateTime(r.created_at) : "N/A",
+      ]);
+      const filename = `requests-${pdfFileStamp()}.pdf`;
+      const result = await exportTablePdf({
+        title: "Request Records",
+        filename,
+        head,
+        body,
+        footerLabel: `${sortedRows.length} ${sortedRows.length === 1 ? "request" : "requests"}`,
+      });
+      if (result.cancelled) return;
+      toast(`PDF saved - ${result.filename}`, "ok");
+    } catch (err) {
+      console.error("PDF export failed:", err);
+      toast(`Could not generate the PDF: ${err?.message || err}`, "err");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div>
       <PageHeader
@@ -479,6 +527,15 @@ export default function Requests() {
         value={filters.status}
         onChange={filters.setStatus}
         countsLoading={loading}
+        actions={
+          <button
+            className="btn export-pdf"
+            onClick={exportPdf}
+            disabled={exporting || !sortedRows.length}
+          >
+            <Icon name="download" size={15} /> {exporting ? "Preparing..." : "Export PDF"}
+          </button>
+        }
       />
 
       <RecordToolbar
@@ -705,6 +762,8 @@ export default function Requests() {
               setForm={setForm}
               rejectReason={rejectReason}
               setRejectReason={setRejectReason}
+              rejectError={rejectError}
+              setRejectError={setRejectError}
               save={save}
               draft={draft}
               online={online}
@@ -749,6 +808,8 @@ function RequestPanel({
   setForm,
   rejectReason,
   setRejectReason,
+  rejectError,
+  setRejectError,
   save,
   draft,
   online,
@@ -771,6 +832,8 @@ function RequestPanel({
           request={request}
           rejectReason={rejectReason}
           setRejectReason={setRejectReason}
+          rejectError={rejectError}
+          setRejectError={setRejectError}
           save={save}
           online={online}
           onDecide={onDecide}
@@ -780,6 +843,10 @@ function RequestPanel({
         <ItemPanel
           request={request}
           catalog={catalog}
+          rejectReason={rejectReason}
+          setRejectReason={setRejectReason}
+          rejectError={rejectError}
+          setRejectError={setRejectError}
           form={form}
           setForm={setForm}
           save={save}
@@ -796,10 +863,38 @@ function RequestPanel({
   );
 }
 
+function RejectReasonField({
+  rejectReason,
+  setRejectReason,
+  rejectError,
+  setRejectError,
+}) {
+  return (
+    <Field label="Reason (required for rejection)" error={Boolean(rejectError)}>
+      <textarea
+        rows={2}
+        value={rejectReason}
+        onChange={(e) => {
+          setRejectReason(applyCapitalizeFirst(e.target));
+          if (rejectError) setRejectError("");
+        }}
+        onBlur={(e) => setRejectReason(capitalizeFirst(e.target.value))}
+        placeholder="Shown to the farmer if rejected"
+        required
+        aria-invalid={Boolean(rejectError)}
+        data-capitalize="true"
+      />
+      {rejectError && <span className="error">{rejectError}</span>}
+    </Field>
+  );
+}
+
 function CorrectionPanel({
   request,
   rejectReason,
   setRejectReason,
+  rejectError,
+  setRejectError,
   save,
   online,
   onDecide,
@@ -907,17 +1002,12 @@ function CorrectionPanel({
         </>
       ) : (
         <>
-          <Field label="Reason (required for rejection)">
-            <textarea
-              rows={2}
-              value={rejectReason}
-              onChange={(e) => setRejectReason(applyCapitalizeFirst(e.target))}
-              onBlur={(e) => setRejectReason(capitalizeFirst(e.target.value))}
-              placeholder="Shown to the farmer if rejected"
-              required
-              data-capitalize="true"
-            />
-          </Field>
+          <RejectReasonField
+            rejectReason={rejectReason}
+            setRejectReason={setRejectReason}
+            rejectError={rejectError}
+            setRejectError={setRejectError}
+          />
           <div
             className="card"
             style={{
@@ -969,6 +1059,10 @@ function CorrectionPanel({
 function ItemPanel({
   request,
   catalog,
+  rejectReason,
+  setRejectReason,
+  rejectError,
+  setRejectError,
   form,
   setForm,
   save,
@@ -1186,6 +1280,15 @@ function ItemPanel({
             </Field>
           </div>
         </div>
+      )}
+
+      {showActions && nextActions.includes("reject") && (
+        <RejectReasonField
+          rejectReason={rejectReason}
+          setRejectReason={setRejectReason}
+          rejectError={rejectError}
+          setRejectError={setRejectError}
+        />
       )}
 
       <Timeline history={request.history} />
